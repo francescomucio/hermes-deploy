@@ -15,6 +15,9 @@ your-deploy-key-here
 -----END OPENSSH PRIVATE KEY-----
 EOK
 
+r2_access_key_id     = "your-r2-access-key"
+r2_secret_access_key = "your-r2-secret-key"
+
 email_accounts = [
   {
     name      = "gmail"

@@ -85,6 +85,9 @@ resource "local_file" "deploy_env" {
     DISCORD_ALLOWED_USERS=${var.discord_allowed_users}
     EMAIL_ADDRESS=${length(var.email_accounts) > 0 ? var.email_accounts[0].email : ""}
     EMAIL_PASSWORD=${length(var.email_accounts) > 0 ? var.email_accounts[0].password : ""}
+    R2_ACCESS_KEY_ID=${var.r2_access_key_id}
+    R2_SECRET_ACCESS_KEY=${var.r2_secret_access_key}
+    R2_ENDPOINT=${var.r2_endpoint}
   EOF
 }
 
@@ -169,5 +172,36 @@ resource "null_resource" "hermes_profiles" {
 
   provisioner "remote-exec" {
     inline = ["chmod +x /tmp/deploy-profiles.sh && /tmp/deploy-profiles.sh"]
+  }
+}
+
+# R2 backup: hourly sync of Hermes data to Cloudflare R2
+resource "null_resource" "hermes_backups" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    script_hash = filesha256("${path.module}/scripts/setup-backups.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.deploy_env.filename
+    destination = "/tmp/hermes-deploy.env"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-backups.sh"
+    destination = "/tmp/setup-backups.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-backups.sh && /tmp/setup-backups.sh"]
   }
 }

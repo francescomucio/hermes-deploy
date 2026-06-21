@@ -72,6 +72,26 @@ variable "deploy_public_key" {
   default     = ""
 }
 
+variable "r2_access_key_id" {
+  description = "Cloudflare R2 access key for backups"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "r2_secret_access_key" {
+  description = "Cloudflare R2 secret key for backups"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "r2_endpoint" {
+  description = "Cloudflare R2 S3 endpoint URL"
+  type        = string
+  default     = "https://7cadc6a3832ed2aa72c806180287146f.eu.r2.cloudflarestorage.com"
+}
+
 variable "email_accounts" {
   description = "Email accounts for himalaya IMAP reading"
   type = list(object({

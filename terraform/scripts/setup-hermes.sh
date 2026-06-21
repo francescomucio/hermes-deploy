@@ -30,6 +30,7 @@ EOF
 ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
 
 # Clone deploy repo if not present
+git config --global --add safe.directory /opt/hermes-deploy
 if [ ! -d /opt/hermes-deploy ]; then
   echo "Cloning deploy repo..."
   git clone "$DEPLOY_REPO" /opt/hermes-deploy
