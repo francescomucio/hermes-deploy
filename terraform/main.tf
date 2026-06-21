@@ -6,22 +6,24 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "hermes-tfstate"
-    key    = "terraform.tfstate"
-    region = "auto"
-
-    endpoints = {
-      s3 = "https://7cadc6a3832ed2aa72c806180287146f.eu.r2.cloudflarestorage.com"
-    }
-
-    skip_credentials_validation = true
-    skip_requesting_account_id  = true
-    skip_metadata_api_check     = true
-    skip_region_validation      = true
-    skip_s3_checksum            = true
-    use_path_style              = true
-  }
+  # Uncomment when Cloudflare R2 TLS cert is provisioned, then run:
+  #   terraform init -migrate-state
+  # backend "s3" {
+  #   bucket = "hermes-tfstate"
+  #   key    = "terraform.tfstate"
+  #   region = "auto"
+  #
+  #   endpoints = {
+  #     s3 = "https://7cadc6a3832ed2aa72c806180287146f.eu.r2.cloudflarestorage.com"
+  #   }
+  #
+  #   skip_credentials_validation = true
+  #   skip_requesting_account_id  = true
+  #   skip_metadata_api_check     = true
+  #   skip_region_validation      = true
+  #   skip_s3_checksum            = true
+  #   use_path_style              = true
+  # }
 }
 
 provider "hcloud" {
@@ -54,6 +56,7 @@ resource "hcloud_server" "hermes" {
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
     deploy_repo           = var.deploy_repo
+    user_timezone         = var.user_timezone
     ollama_api_key        = var.ollama_api_key
     ollama_model          = var.ollama_model
     discord_bot_token     = var.discord_bot_token

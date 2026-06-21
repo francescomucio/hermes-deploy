@@ -21,6 +21,12 @@ variable "location" {
   default     = "nbg1"
 }
 
+variable "user_timezone" {
+  description = "User's timezone for scheduling and display (e.g. Europe/Berlin). Server stays UTC internally."
+  type        = string
+  default     = "Europe/Berlin"
+}
+
 variable "deploy_repo" {
   description = "Git URL of this deploy repo (cloned onto the server for self-modification)"
   type        = string
