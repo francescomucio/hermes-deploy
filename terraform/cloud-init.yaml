@@ -1,5 +1,5 @@
 #cloud-config
-# Minimal cloud-init: only install packages and set up volume mount.
+# Minimal cloud-init: only install Docker.
 # Everything else is handled by remote-exec scripts so changes don't
 # trigger a server rebuild.
 
@@ -17,12 +17,6 @@ runcmd:
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-  # Mount the persistent volume and symlink ~/.hermes
-  - mkdir -p /mnt/HC_Volume_${volume_id}
-  - mount /dev/sdb /mnt/HC_Volume_${volume_id} || true
-  - echo '/dev/sdb /mnt/HC_Volume_${volume_id} ext4 defaults,nofail 0 0' >> /etc/fstab
-  - ln -sf /mnt/HC_Volume_${volume_id} /root/.hermes
 
   # Add deploy key public key to authorized_keys (for Terraform provisioner access)
   - echo '${deploy_public_key}' >> /root/.ssh/authorized_keys

@@ -60,7 +60,7 @@ echo "Running initial backup..."
 /usr/local/bin/hermes-backup || echo "Initial backup had errors (will retry on next cron run)"
 
 # Set up hourly cron
-CRON_LINE="0 * * * * /usr/local/bin/hermes-backup"
+CRON_LINE="*/30 * * * * /usr/local/bin/hermes-backup"
 (crontab -l 2>/dev/null | grep -v hermes-backup; echo "$CRON_LINE") | crontab -
 
 echo "=== Backups configured (hourly to R2) ==="

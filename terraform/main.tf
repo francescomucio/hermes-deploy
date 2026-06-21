@@ -44,13 +44,6 @@ resource "hcloud_firewall" "hermes" {
   }
 }
 
-resource "hcloud_volume" "hermes_data" {
-  name     = "hermes-data"
-  size     = 10
-  location = var.location
-  format   = "ext4"
-}
-
 resource "hcloud_server" "hermes" {
   name        = "hermes"
   server_type = var.server_type
@@ -60,15 +53,8 @@ resource "hcloud_server" "hermes" {
   firewall_ids = [hcloud_firewall.hermes.id]
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    volume_id         = hcloud_volume.hermes_data.id
     deploy_public_key = var.deploy_public_key
   })
-}
-
-resource "hcloud_volume_attachment" "hermes_data" {
-  volume_id = hcloud_volume.hermes_data.id
-  server_id = hcloud_server.hermes.id
-  automount = true
 }
 
 # Render config files with secrets (gitignored)
@@ -99,15 +85,13 @@ resource "local_file" "himalaya_config" {
   })
 }
 
-# Hermes setup: clone repos, build Docker, configure
+# Hermes setup: clone repos, pull image, configure
 resource "null_resource" "hermes_setup" {
   triggers = {
-    server_id = hcloud_server.hermes.id
-    env_hash  = local_file.deploy_env.content_sha256
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.deploy_env.content_sha256
     script_hash = filesha256("${path.module}/scripts/setup-hermes.sh")
   }
-
-  depends_on = [hcloud_volume_attachment.hermes_data]
 
   connection {
     type        = "ssh"
@@ -134,7 +118,7 @@ resource "null_resource" "hermes_setup" {
     inline = ["chmod +x /tmp/setup-hermes.sh && /tmp/setup-hermes.sh"]
   }
 
-  # Restore from R2 backup if volume is empty (fresh deploy)
+  # Restore from R2 backup (fresh deploy gets latest data)
   provisioner "file" {
     source      = "${path.module}/scripts/restore-backup.sh"
     destination = "/tmp/restore-backup.sh"
@@ -185,7 +169,7 @@ resource "null_resource" "hermes_profiles" {
   }
 }
 
-# R2 backup: hourly sync of Hermes data to Cloudflare R2
+# R2 backup: every 30 min sync of Hermes data to Cloudflare R2
 resource "null_resource" "hermes_backups" {
   triggers = {
     server_id   = hcloud_server.hermes.id
