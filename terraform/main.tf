@@ -56,17 +56,18 @@ resource "hcloud_server" "hermes" {
     deploy_public_key = var.deploy_public_key
   })
 
-  # Backup before destroy (skip with: terraform destroy -var='skip_pre_destroy_backup=true')
+  # Backup before destroy — uses ssh-agent (deploy key must be loaded)
   provisioner "remote-exec" {
-    when = destroy
+    when       = destroy
+    on_failure = continue
     inline = [
       "if command -v rclone &> /dev/null && [ -f /usr/local/bin/hermes-backup ]; then echo '=== Pre-destroy backup ===' && /usr/local/bin/hermes-backup && echo '=== Backup complete ==='; else echo 'Backup not configured, skipping'; fi"
     ]
     connection {
-      type        = "ssh"
-      host        = self.ipv4_address
-      user        = "root"
-      private_key = var.deploy_key
+      type  = "ssh"
+      host  = self.ipv4_address
+      user  = "root"
+      agent = true
     }
   }
 }
@@ -89,6 +90,12 @@ resource "local_file" "deploy_env" {
     R2_SECRET_ACCESS_KEY=${var.r2_secret_access_key}
     R2_ENDPOINT=${var.r2_endpoint}
   EOF
+}
+
+resource "local_file" "deploy_key_file" {
+  filename        = "${path.module}/.rendered/deploy_key"
+  file_permission = "0600"
+  content         = var.deploy_key
 }
 
 resource "local_file" "himalaya_config" {
