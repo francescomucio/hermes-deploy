@@ -1,0 +1,19 @@
+%{ for account in email_accounts ~}
+[accounts.${account.name}]
+email = "${account.email}"
+default = ${account.default}
+
+backend.type = "imap"
+backend.host = "${account.imap_host}"
+backend.port = 993
+backend.encryption.type = "tls"
+backend.login = "${account.email}"
+backend.auth.type = "password"
+backend.auth.raw = "${account.password}"
+
+folder.aliases.inbox = "INBOX"
+folder.aliases.sent = "[Gmail]/Sent Mail"
+folder.aliases.drafts = "[Gmail]/Drafts"
+folder.aliases.trash = "[Gmail]/Trash"
+
+%{ endfor ~}

@@ -1,0 +1,27 @@
+hetzner_token         = "your-hetzner-api-token"
+ssh_public_key        = "ssh-ed25519 AAAA... your-key"
+server_type           = "cx22"
+location              = "nbg1"
+deploy_repo           = "https://github.com/your-user/hermes-deploy.git"
+ollama_api_key        = "your-ollama-api-key"
+ollama_model          = "deepseek-v4-flash"
+discord_bot_token     = "your-discord-bot-token"
+discord_allowed_users = "your-discord-user-id"
+
+email_accounts = [
+  {
+    name      = "gmail"
+    email     = "you@gmail.com"
+    password  = "your-app-password"
+    imap_host = "imap.gmail.com"
+    default   = true
+  },
+  # Add more accounts:
+  # {
+  #   name      = "work"
+  #   email     = "you@company.com"
+  #   password  = "app-password"
+  #   imap_host = "imap.gmail.com"
+  #   default   = false
+  # },
+]
