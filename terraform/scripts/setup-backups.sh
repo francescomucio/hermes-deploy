@@ -55,9 +55,9 @@ echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup complete" >> /var/log/hermes-backup.
 BACKUPEOF
 chmod +x /usr/local/bin/hermes-backup
 
-# Run initial backup
+# Run initial backup (allow failure — transient R2 errors shouldn't block deploy)
 echo "Running initial backup..."
-/usr/local/bin/hermes-backup
+/usr/local/bin/hermes-backup || echo "Initial backup had errors (will retry on next cron run)"
 
 # Set up hourly cron
 CRON_LINE="0 * * * * /usr/local/bin/hermes-backup"
