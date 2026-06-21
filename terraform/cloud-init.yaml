@@ -18,8 +18,24 @@ runcmd:
   # Clone Hermes
   - git clone https://github.com/nousresearch/hermes-agent /opt/hermes
 
-  # Clone this deploy repo (gives Hermes git access to modify its own setup)
-  - git clone ${deploy_repo} /opt/hermes-deploy
+  # Set up deploy key for git push access
+  - |
+    mkdir -p /root/.ssh
+    cat > /root/.ssh/hermes_deploy_key <<'DKEOF'
+${deploy_key}
+DKEOF
+    chmod 600 /root/.ssh/hermes_deploy_key
+    cat > /root/.ssh/config <<'SSHCEOF'
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile /root/.ssh/hermes_deploy_key
+  StrictHostKeyChecking no
+SSHCEOF
+
+  # Clone this deploy repo via SSH (gives Hermes read+write git access)
+  - git clone git@github.com:francescomucio/hermes-deploy.git /opt/hermes-deploy
+  - cd /opt/hermes-deploy && git config user.name "Claudiano" && git config user.email "claudiano@hermes"
 
   # Write .env for docker-compose variable substitution
   - |

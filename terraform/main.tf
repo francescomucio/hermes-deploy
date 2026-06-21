@@ -56,6 +56,7 @@ resource "hcloud_server" "hermes" {
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
     deploy_repo           = var.deploy_repo
+    deploy_key            = var.deploy_key
     user_timezone         = var.user_timezone
     ollama_api_key        = var.ollama_api_key
     ollama_model          = var.ollama_model

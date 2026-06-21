@@ -58,6 +58,13 @@ variable "discord_allowed_users" {
   default     = ""
 }
 
+variable "deploy_key" {
+  description = "SSH private key for pushing to the deploy repo from the server"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "email_accounts" {
   description = "Email accounts for himalaya IMAP reading"
   type = list(object({

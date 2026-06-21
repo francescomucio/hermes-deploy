@@ -8,6 +8,11 @@ ollama_api_key        = "your-ollama-api-key"
 ollama_model          = "deepseek-v4-flash"
 discord_bot_token     = "your-discord-bot-token"
 discord_allowed_users = "your-discord-user-id"
+deploy_key            = <<-EOK
+-----BEGIN OPENSSH PRIVATE KEY-----
+your-deploy-key-here
+-----END OPENSSH PRIVATE KEY-----
+EOK
 
 email_accounts = [
   {
