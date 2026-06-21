@@ -32,6 +32,14 @@ done
 mkdir -p /root/.hermes/.config/himalaya
 cp /tmp/himalaya-config.toml /root/.hermes/.config/himalaya/config.toml
 
+# Deploy skills from deploy repo
+for skill in /opt/hermes-deploy/skills/*/; do
+  name=$(basename "$skill")
+  echo "Deploying skill: $name"
+  mkdir -p "/root/.hermes/skills/$name"
+  cp -r "$skill"/* "/root/.hermes/skills/$name/"
+done
+
 # Fix ownership
 chown -R 10000:10000 /root/.hermes/SOUL.md
 chown -R 10000:10000 /root/.hermes/profiles/ 2>/dev/null || true
