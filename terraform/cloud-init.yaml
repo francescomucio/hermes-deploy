@@ -34,8 +34,8 @@ Host github.com
 SSHCEOF
 
   # Clone this deploy repo via SSH (gives Hermes read+write git access)
-  - git clone git@github.com:francescomucio/hermes-deploy.git /opt/hermes-deploy
-  - cd /opt/hermes-deploy && git config user.name "Claudiano" && git config user.email "claudiano@hermes"
+  - git clone ${deploy_repo} /opt/hermes-deploy
+  - cd /opt/hermes-deploy && git config user.name "Hermes" && git config user.email "hermes@deploy"
 
   # Write .env for docker-compose variable substitution
   - |
@@ -59,6 +59,7 @@ SSHCEOF
     cd /opt/hermes
     sed -i '0,/HERMES_GID=$${HERMES_GID:-10000}/s//&\n      - DISCORD_BOT_TOKEN=$${DISCORD_BOT_TOKEN}\n      - DISCORD_ALLOWED_USERS=$${DISCORD_ALLOWED_USERS}\n      - OLLAMA_API_KEY=$${OLLAMA_API_KEY}\n      - OLLAMA_BASE_URL=$${OLLAMA_BASE_URL}\n      - HERMES_MODEL=$${HERMES_MODEL}\n      - EMAIL_ADDRESS=$${EMAIL_ADDRESS}\n      - EMAIL_PASSWORD=$${EMAIL_PASSWORD}\n      - EMAIL_IMAP_HOST=$${EMAIL_IMAP_HOST}\n      - EMAIL_IMAP_PORT=$${EMAIL_IMAP_PORT}\n      - EMAIL_ALLOWED_USERS=$${EMAIL_ALLOWED_USERS}\n      - EMAIL_POLL_INTERVAL=$${EMAIL_POLL_INTERVAL}\n      - HERMES_USER_TIMEZONE=${user_timezone}/' docker-compose.yml
     sed -i 's|command: \["gateway", "run"\]|command: ["sleep", "infinity"]|' docker-compose.yml
+    sed -i '/- ~\/.hermes:\/opt\/data/a\      - /opt/hermes-deploy:/opt/hermes-deploy' docker-compose.yml
     echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
     DASHBOARD_VOLUMES='      - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro'
     sed -i "/container_name: hermes-dashboard/a\\    volumes:\n$${DASHBOARD_VOLUMES}" docker-compose.yml
@@ -84,21 +85,17 @@ SSHCEOF
     rm -rf /root/.hermes/home/.config/himalaya 2>/dev/null
     docker exec hermes ln -sf /opt/data/.config/himalaya /opt/data/home/.config/himalaya
 
-  # Deploy profiles and SOUL.md from the deploy repo, with timezone appended
+  # Symlink profiles from deploy repo (edits in repo are instantly live)
+  - ln -sf /opt/hermes-deploy/profiles/default/SOUL.md /root/.hermes/SOUL.md
   - |
-    cp /opt/hermes-deploy/profiles/default/SOUL.md /root/.hermes/SOUL.md
-    cat >> /root/.hermes/SOUL.md <<'TZEOF'
-
-## Timezone
-
-The user's timezone is ${user_timezone}. When the user mentions a time (e.g. "remind me at 9am", "check at 3pm"), always interpret it as ${user_timezone}. When displaying times to the user, convert from UTC to ${user_timezone}. The system runs in UTC internally — use `TZ=${user_timezone} date` to get the user's local time.
-TZEOF
-  - |
-    if [ -d /opt/hermes-deploy/profiles/researcher ]; then
-      docker exec hermes mkdir -p /opt/data/profiles/researcher
-      cp /opt/hermes-deploy/profiles/researcher/SOUL.md /root/.hermes/profiles/researcher/SOUL.md
-      cp /opt/hermes-deploy/profiles/researcher/profile.yaml /root/.hermes/profiles/researcher/profile.yaml
-    fi
+    for profile in /opt/hermes-deploy/profiles/*/; do
+      name=$(basename "$profile")
+      [ "$name" = "default" ] && continue
+      mkdir -p /root/.hermes/profiles/$name
+      for f in SOUL.md profile.yaml; do
+        [ -f "$profile/$f" ] && ln -sf "$profile/$f" /root/.hermes/profiles/$name/$f
+      done
+    done
 
   # Restart to pick up all changes
   - cd /opt/hermes && docker compose restart
