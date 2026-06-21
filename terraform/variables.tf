@@ -9,6 +9,7 @@ variable "ssh_public_key" {
   type        = string
 }
 
+
 variable "server_type" {
   description = "Hetzner server type (e.g. cx22, cpx11)"
   type        = string
@@ -30,7 +31,7 @@ variable "user_timezone" {
 variable "deploy_repo" {
   description = "Git URL of this deploy repo (cloned onto the server for self-modification)"
   type        = string
-  default     = "https://github.com/francescomucio/hermes-deploy.git"
+  default     = "git@github.com:francescomucio/hermes-deploy.git"
 }
 
 variable "ollama_api_key" {
@@ -62,6 +63,12 @@ variable "deploy_key" {
   description = "SSH private key for pushing to the deploy repo from the server"
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "deploy_public_key" {
+  description = "SSH public key corresponding to deploy_key (for server authorized_keys)"
+  type        = string
   default     = ""
 }
 

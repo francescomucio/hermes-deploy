@@ -1,4 +1,7 @@
 #cloud-config
+# Minimal cloud-init: only install packages and set up volume mount.
+# Everything else is handled by remote-exec scripts so changes don't
+# trigger a server rebuild.
 
 packages:
   - git
@@ -15,95 +18,16 @@ runcmd:
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-  # Clone Hermes
-  - git clone https://github.com/nousresearch/hermes-agent /opt/hermes
+  # Mount the persistent volume and symlink ~/.hermes
+  - mkdir -p /mnt/HC_Volume_${volume_id}
+  - mount /dev/sdb /mnt/HC_Volume_${volume_id} || true
+  - echo '/dev/sdb /mnt/HC_Volume_${volume_id} ext4 defaults,nofail 0 0' >> /etc/fstab
+  - ln -sf /mnt/HC_Volume_${volume_id} /root/.hermes
 
-  # Set up deploy key for git push access
-  - |
-    mkdir -p /root/.ssh
-    cat > /root/.ssh/hermes_deploy_key <<'DKEOF'
-${deploy_key}
-DKEOF
-    chmod 600 /root/.ssh/hermes_deploy_key
-    cat > /root/.ssh/config <<'SSHCEOF'
-Host github.com
-  HostName github.com
-  User git
-  IdentityFile /root/.ssh/hermes_deploy_key
-  StrictHostKeyChecking no
-SSHCEOF
-
-  # Clone this deploy repo via SSH (gives Hermes read+write git access)
-  - git clone ${deploy_repo} /opt/hermes-deploy
-  - cd /opt/hermes-deploy && git config user.name "Hermes" && git config user.email "hermes@deploy"
-
-  # Write .env for docker-compose variable substitution
-  - |
-    cat > /opt/hermes/.env <<'ENVEOF'
-    OLLAMA_API_KEY=${ollama_api_key}
-    OLLAMA_BASE_URL=https://ollama.com/v1
-    HERMES_MODEL=${ollama_model}
-    DISCORD_BOT_TOKEN=${discord_bot_token}
-    DISCORD_ALLOWED_USERS=${discord_allowed_users}
-    EMAIL_ADDRESS=${email_address}
-    EMAIL_PASSWORD=${email_password}
-    EMAIL_IMAP_HOST=imap.gmail.com
-    EMAIL_IMAP_PORT=993
-    EMAIL_ALLOWED_USERS=${email_address}
-    EMAIL_POLL_INTERVAL=60
-    ENVEOF
-
-  # Patch docker-compose.yml: pass env vars to gateway (first match only),
-  # disable gateway in dashboard, set gateway CMD to sleep (s6 manages it)
-  - |
-    cd /opt/hermes
-    sed -i '0,/HERMES_GID=$${HERMES_GID:-10000}/s//&\n      - DISCORD_BOT_TOKEN=$${DISCORD_BOT_TOKEN}\n      - DISCORD_ALLOWED_USERS=$${DISCORD_ALLOWED_USERS}\n      - OLLAMA_API_KEY=$${OLLAMA_API_KEY}\n      - OLLAMA_BASE_URL=$${OLLAMA_BASE_URL}\n      - HERMES_MODEL=$${HERMES_MODEL}\n      - EMAIL_ADDRESS=$${EMAIL_ADDRESS}\n      - EMAIL_PASSWORD=$${EMAIL_PASSWORD}\n      - EMAIL_IMAP_HOST=$${EMAIL_IMAP_HOST}\n      - EMAIL_IMAP_PORT=$${EMAIL_IMAP_PORT}\n      - EMAIL_ALLOWED_USERS=$${EMAIL_ALLOWED_USERS}\n      - EMAIL_POLL_INTERVAL=$${EMAIL_POLL_INTERVAL}\n      - HERMES_USER_TIMEZONE=${user_timezone}/' docker-compose.yml
-    sed -i 's|command: \["gateway", "run"\]|command: ["sleep", "infinity"]|' docker-compose.yml
-    sed -i '/- ~\/.hermes:\/opt\/data/a\      - /opt/hermes-deploy:/opt/hermes-deploy' docker-compose.yml
-    echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
-    DASHBOARD_VOLUMES='      - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro'
-    sed -i "/container_name: hermes-dashboard/a\\    volumes:\n$${DASHBOARD_VOLUMES}" docker-compose.yml
-
-  # Build and start containers
-  - cd /opt/hermes && docker compose up -d --build
-
-  # Wait for containers to initialize and create config.yaml
-  - sleep 15
-
-  # Configure Hermes: model, base_url, max_turns, auto_thread
-  - |
-    docker exec hermes sed -i \
-      's|default: anthropic/claude-opus-4.6|default: ${ollama_model}|; s|base_url: https://openrouter.ai/api/v1|base_url: https://ollama.com/v1|; s|auto_thread: true|auto_thread: false|; s|max_turns: 90|max_turns: 100|' \
-      /opt/data/config.yaml
-
-  # Install himalaya email client to persistent volume
-  - docker exec hermes sh -c 'mkdir -p /opt/data/.local/bin && curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=/opt/data/.local sh'
-
-  # Write himalaya config and symlink both paths
-  - |
-    docker exec hermes mkdir -p /opt/data/.config/himalaya /opt/data/home/.config
-    rm -rf /root/.hermes/home/.config/himalaya 2>/dev/null
-    docker exec hermes ln -sf /opt/data/.config/himalaya /opt/data/home/.config/himalaya
-
-  # Symlink profiles from deploy repo (edits in repo are instantly live)
-  - ln -sf /opt/hermes-deploy/profiles/default/SOUL.md /root/.hermes/SOUL.md
-  - |
-    for profile in /opt/hermes-deploy/profiles/*/; do
-      name=$(basename "$profile")
-      [ "$name" = "default" ] && continue
-      mkdir -p /root/.hermes/profiles/$name
-      for f in SOUL.md profile.yaml; do
-        [ -f "$profile/$f" ] && ln -sf "$profile/$f" /root/.hermes/profiles/$name/$f
-      done
-    done
-
-  # Restart to pick up all changes
-  - cd /opt/hermes && docker compose restart
+  # Add deploy key public key to authorized_keys (for Terraform provisioner access)
+  - echo '${deploy_public_key}' >> /root/.ssh/authorized_keys
 
 write_files:
   - path: /etc/docker/daemon.json
     content: |
       {"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}
-  - path: /root/.hermes/.config/himalaya/config.toml
-    content: |
-${himalaya_config}
