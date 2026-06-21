@@ -26,7 +26,7 @@ graph TB
         end
 
         subgraph Storage
-            VOL["Hetzner Volume<br/>(~/.hermes → /mnt/volume)<br/>memories, sessions, config"]
+            DATA["~/.hermes<br/>(local disk)<br/>memories, sessions, config"]
             REPO["/opt/hermes-deploy<br/>(this repo, git push)"]
         end
 
@@ -36,7 +36,7 @@ graph TB
     end
 
     GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4-flash, etc.)"]
-    VOL -.->|hourly backup| R2["Cloudflare R2<br/>(disaster recovery)"]
+    DATA -.->|backup every 30 min| R2["Cloudflare R2<br/>(backup + restore)"]
 ```
 
 ### How it works
@@ -45,11 +45,11 @@ Terraform manages three layers, each independently updatable:
 
 | Layer | What | Triggers rebuild? |
 |-------|------|-------------------|
-| **cloud-init** | Docker install, volume mount | Only on server size/region change |
-| **setup script** | Clone repos, pull image, configure docker-compose | On config changes (re-runs over SSH, no rebuild) |
+| **cloud-init** | Docker install | Only on server size/region change |
+| **setup script** | Clone repos, pull image, configure, restore backup | On config changes (re-runs over SSH, no rebuild) |
 | **profiles script** | Deploy SOUL.md, himalaya config | On profile changes (re-runs over SSH, no rebuild) |
 
-Data lives on a **Hetzner Volume** that persists across server rebuilds, with **hourly R2 backups** for disaster recovery.
+Data lives on the server's local disk with **R2 backups every 30 minutes**. On redeploy, the latest backup is restored automatically (max 30 min data loss).
 
 ## Profiles
 
@@ -246,7 +246,7 @@ Replace the included profiles with your own. The `profiles/default/SOUL.md` is y
 
 ```
 ┌─────────────────────────────────┐
-│  Hetzner Volume (10GB, €0.50/m) │
+│  Server local disk              │
 │  ~/.hermes/                     │
 │  ├── memories/                  │
 │  ├── sessions/                  │
@@ -254,7 +254,7 @@ Replace the included profiles with your own. The `profiles/default/SOUL.md` is y
 │  ├── profiles/                  │
 │  └── skills/                    │
 └────────────┬────────────────────┘
-             │ hourly rclone sync
+             │ rclone sync every 30 min
              ▼
 ┌─────────────────────────────────┐
 │  Cloudflare R2 (free)           │
@@ -262,8 +262,9 @@ Replace the included profiles with your own. The `profiles/default/SOUL.md` is y
 └─────────────────────────────────┘
 ```
 
-- **Volume**: survives server rebuilds (`terraform apply`). All Hermes data lives here.
-- **R2 backup**: disaster recovery. Hourly sync via rclone cron. If the volume is lost, restore from R2.
+- **Local disk**: all Hermes data lives here. Wiped on server rebuild.
+- **R2 backup**: every 30 minutes via rclone cron. On redeploy, the setup script restores the latest backup automatically. Max 30 minutes of data loss.
+- **Force backup before redeploy**: `ssh root@<ip> /usr/local/bin/hermes-backup`
 
 ## Project Structure
 
@@ -364,7 +365,6 @@ Check logs: `docker exec hermes cat /opt/data/logs/gateway.log | tail -20`
 | Service | Cost |
 |---------|------|
 | Hetzner VPS | ~€5-8/month (cx22/cx23) |
-| Hetzner Volume | ~€0.50/month (10GB) |
 | Ollama Cloud | Pay-per-use (model dependent) |
 | Cloudflare R2 | Free (10GB storage, no egress) |
 | Discord / Email | Free |
