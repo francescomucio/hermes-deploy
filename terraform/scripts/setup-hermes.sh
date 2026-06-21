@@ -6,11 +6,15 @@ source /tmp/hermes-deploy.env
 
 echo "=== Hermes Setup ==="
 
-# Clone Hermes agent if not present
+# Clone Hermes agent repo (needed for docker-compose.yml)
 if [ ! -d /opt/hermes ]; then
   echo "Cloning hermes-agent..."
   git clone https://github.com/nousresearch/hermes-agent /opt/hermes
 fi
+
+# Pull pre-built Docker image (skip ~10 min build)
+echo "Pulling pre-built Hermes image..."
+docker pull nousresearch/hermes-agent:latest
 
 # Set up deploy key (stored with \n escapes in env file)
 mkdir -p /root/.ssh
@@ -70,12 +74,14 @@ EMAIL_IMAP_HOST=imap.gmail.com
 EMAIL_IMAP_PORT=993
 EMAIL_ALLOWED_USERS=$EMAIL_ADDRESS
 EMAIL_POLL_INTERVAL=60
+HERMES_USER_TIMEZONE=$USER_TIMEZONE
 EOF
 
-# Write docker-compose.override.yml (no more sed patching!)
+# Write docker-compose.override.yml (uses pre-built image, no build needed)
 cat > /opt/hermes/docker-compose.override.yml <<'EOF'
 services:
   gateway:
+    image: nousresearch/hermes-agent:latest
     command: ["sleep", "infinity"]
     volumes:
       - ~/.hermes:/opt/data
@@ -97,6 +103,7 @@ services:
       - HERMES_USER_TIMEZONE=${HERMES_USER_TIMEZONE}
 
   dashboard:
+    image: nousresearch/hermes-agent:latest
     volumes:
       - ~/.hermes:/opt/data
       - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro
@@ -105,11 +112,8 @@ EOF
 # Create no-reconcile script (prevents dual gateway in dashboard)
 echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
 
-# Add timezone to docker-compose .env
-echo "HERMES_USER_TIMEZONE=$USER_TIMEZONE" >> /opt/hermes/.env
-
-echo "=== Building and starting containers ==="
-cd /opt/hermes && docker compose up -d --build
+echo "=== Starting containers ==="
+cd /opt/hermes && docker compose up -d
 
 echo "=== Waiting for containers to initialize ==="
 sleep 15
@@ -123,8 +127,11 @@ docker exec hermes sed -i \
 docker exec hermes git config --global --add safe.directory /opt/hermes-deploy
 docker exec hermes sh -c 'cd /opt/hermes-deploy && git config user.name Claudiano && git config user.email claudiano@hermes'
 
-# Install himalaya to persistent volume
-docker exec hermes sh -c 'mkdir -p /opt/data/.local/bin && curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=/opt/data/.local sh'
+# Install himalaya to persistent volume (if not already there)
+if ! docker exec hermes himalaya --version > /dev/null 2>&1; then
+  echo "Installing himalaya..."
+  docker exec hermes sh -c 'mkdir -p /opt/data/.local/bin && curl -sSL https://raw.githubusercontent.com/pimalaya/himalaya/master/install.sh | PREFIX=/opt/data/.local sh'
+fi
 
 # Himalaya config directories + symlink
 docker exec hermes mkdir -p /opt/data/.config/himalaya /opt/data/home/.config
