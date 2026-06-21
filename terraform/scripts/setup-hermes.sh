@@ -138,6 +138,37 @@ fi
 docker exec hermes mkdir -p /opt/data/.config/himalaya /opt/data/home/.config
 docker exec hermes ln -sf /opt/data/.config/himalaya /opt/data/home/.config/himalaya
 
+# Set up auto-pull cron (syncs git changes every 5 minutes)
+cat > /usr/local/bin/hermes-sync <<'SYNCEOF'
+#!/bin/bash
+cd /opt/hermes-deploy || exit 1
+BEFORE=$(git rev-parse HEAD)
+git pull --quiet 2>/dev/null || exit 0
+AFTER=$(git rev-parse HEAD)
+if [ "$BEFORE" != "$AFTER" ]; then
+  # New commits — deploy profiles
+  cp /opt/hermes-deploy/profiles/default/SOUL.md /root/.hermes/SOUL.md
+  for profile in /opt/hermes-deploy/profiles/*/; do
+    name=$(basename "$profile")
+    [ "$name" = "default" ] && continue
+    mkdir -p "/root/.hermes/profiles/$name"
+    for f in SOUL.md profile.yaml; do
+      [ -f "$profile/$f" ] && cp "$profile/$f" "/root/.hermes/profiles/$name/$f"
+    done
+  done
+  for skill in /opt/hermes-deploy/skills/*/; do
+    name=$(basename "$skill")
+    mkdir -p "/root/.hermes/skills/$name"
+    cp -r "$skill"/* "/root/.hermes/skills/$name/"
+  done
+  chown -R 10000:10000 /root/.hermes/SOUL.md /root/.hermes/profiles/ /root/.hermes/skills/ 2>/dev/null
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) synced $(git log --oneline $BEFORE..$AFTER | wc -l) commit(s)" >> /var/log/hermes-sync.log
+fi
+SYNCEOF
+chmod +x /usr/local/bin/hermes-sync
+SYNC_CRON="*/5 * * * * /usr/local/bin/hermes-sync"
+(crontab -l 2>/dev/null | grep -v hermes-sync; echo "$SYNC_CRON") | crontab -
+
 # Copy .env to data dir (Hermes reads config from here)
 cp /opt/hermes/.env /root/.hermes/.env
 

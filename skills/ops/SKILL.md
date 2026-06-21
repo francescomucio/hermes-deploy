@@ -110,7 +110,17 @@ SOUL.md changes take effect immediately — no restart needed.
 
 ## Deploy Repo
 
-Pull latest changes from GitHub:
+Changes pushed to GitHub are auto-synced every 5 minutes via cron. To sync immediately:
+```bash
+/usr/local/bin/hermes-sync
+```
+
+Check sync log:
+```bash
+tail -5 /var/log/hermes-sync.log
+```
+
+Pull latest manually:
 ```bash
 cd /opt/hermes-deploy && git pull
 ```
