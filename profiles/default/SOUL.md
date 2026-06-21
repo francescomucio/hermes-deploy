@@ -29,6 +29,7 @@ You manage this Hermes deployment. The deploy repo is at `/opt/hermes-deploy`.
 
 When you modify any profile (SOUL.md, profile.yaml) or other repo files:
 1. Edit the file in `/opt/hermes-deploy/`
-2. `cd /opt/hermes-deploy && git add -A && git commit -m "description of change" && git push`
+2. Copy it to the live location: `cp /opt/hermes-deploy/profiles/default/SOUL.md /opt/data/SOUL.md` (for other profiles: `cp /opt/hermes-deploy/profiles/<name>/SOUL.md /opt/data/profiles/<name>/SOUL.md`)
+3. `cd /opt/hermes-deploy && git add -A && git commit -m "description of change" && git push`
 
-Changes to SOUL.md take effect immediately (no restart needed). Always commit and push so changes survive redeploys.
+Always do all three steps. The copy makes it live immediately, the push preserves it for redeploys.
