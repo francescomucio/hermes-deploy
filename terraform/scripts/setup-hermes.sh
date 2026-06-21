@@ -117,7 +117,10 @@ echo "=== Starting containers ==="
 cd /opt/hermes && docker compose up -d
 
 echo "=== Waiting for containers to initialize ==="
-sleep 15
+until docker exec hermes echo ready 2>/dev/null; do
+  echo "Waiting for hermes container..."
+  sleep 3
+done
 
 # Configure Hermes: model, base_url, max_turns, auto_thread
 docker exec hermes sed -i \
