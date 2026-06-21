@@ -55,10 +55,14 @@ Data lives on the server's local disk with **R2 backups every 30 minutes**. On r
 
 Agent personalities live in `profiles/`. Each profile has a `SOUL.md` that defines its character.
 
-| Profile | Personality | Description |
-|---------|------------|-------------|
-| `default` | **Claudiano** (Claudio Bisio) | Warm, witty, Italian slips when surprised |
-| `researcher` | **Barbero** (Alessandro Barbero) | Narrative historian, structured reports, ironic |
+| Profile | Personality | Model | Description |
+|---------|------------|-------|-------------|
+| `default` | **Claudiano** (Claudio Bisio) | `deepseek-v4-flash` | Warm, witty, Italian slips when surprised |
+| `coder` | **Eduardo De Filippo** ('o professore) | `qwen3-coder:480b` | Brilliant coder, humble in appearance, theatrical precision |
+| `bruno-barbieri` | **Bruno Barbieri** (chef stellato) | `kimi-k2.7-code` | Code reviewer, technical perfectionist, culinary metaphors |
+| `calvino` | **Italo Calvino** (Lezioni Americane) | `glm-5.2` | Writing reviewer, lightness, exactitude, visibility |
+| `cannavacciuolo` | **Antonino Cannavacciuolo** (chef PM) | `deepseek-v4-flash` | Project/product manager, structured, "Forza e coraggio" |
+| `researcher` | **Barbero** (Alessandro Barbero) | `glm-5.2` | Narrative historian, structured reports, ironic |
 
 Create your own by adding a directory under `profiles/` with a `SOUL.md`.
 
@@ -166,10 +170,11 @@ Hermes uses [Ollama Cloud](https://ollama.com) as the LLM provider. Set `ollama_
 
 | Model | Best for | Notes |
 |-------|----------|-------|
-| `deepseek-v4-flash` | General use (recommended) | Fast, strong reasoning, good at multi-step tool use |
-| `gemma4:31b` | General use | Good quality, Google model |
-| `gemma3:4b` | Testing only | Free/cheap, but too small for reliable tool use or persona adherence |
-| `deepseek-v4-pro` | Complex reasoning | Slower, more expensive |
+| `deepseek-v4-flash` | General use, PM (recommended) | Fast, strong reasoning, good at multi-step tool use |
+| `qwen3-coder:480b` | Coding (Eduardo profile) | Specialized for code generation, 480B |
+| `kimi-k2.7-code` | Code review (Bruno profile) | Latest coding specialist, June 2026 |
+| `glm-5.2` | Writing review, research (Calvino, Barbero) | Newest model on platform, excellent language understanding |
+| `deepseek-v4-pro` | Complex reasoning | Slower, more expensive, 1.6T |
 
 Start with `deepseek-v4-flash` — it handles agentic workflows (tool calls, pagination, multi-step tasks) well. Smaller models struggle with tool use and may ignore the SOUL.md personality.
 
@@ -277,9 +282,21 @@ hermes-deploy/
 ├── profiles/
 │   ├── default/
 │   │   └── SOUL.md                     # Default agent personality
+│   ├── coder/
+│   │   ├── SOUL.md                     # Eduardo De Filippo coder
+│   │   └── profile.yaml
+│   ├── bruno-barbieri/
+│   │   ├── SOUL.md                     # Bruno Barbieri code reviewer
+│   │   └── profile.yaml
+│   ├── calvino/
+│   │   ├── SOUL.md                     # Italo Calvino writing reviewer
+│   │   └── profile.yaml
+│   ├── cannavacciuolo/
+│   │   ├── SOUL.md                     # Antonino Cannavacciuolo PM
+│   │   └── profile.yaml
 │   └── researcher/
-│       ├── SOUL.md                     # Researcher personality
-│       └── profile.yaml               # Profile metadata
+│       ├── SOUL.md                     # Barbero researcher
+│       └── profile.yaml
 └── terraform/
     ├── main.tf                         # Provider, backend, resources
     ├── variables.tf                    # All inputs
