@@ -130,4 +130,13 @@ docker exec hermes sh -c 'mkdir -p /opt/data/.local/bin && curl -sSL https://raw
 docker exec hermes mkdir -p /opt/data/.config/himalaya /opt/data/home/.config
 docker exec hermes ln -sf /opt/data/.config/himalaya /opt/data/home/.config/himalaya
 
+# Copy .env to data dir (Hermes reads config from here)
+cp /opt/hermes/.env /root/.hermes/.env
+
+# Fix ownership on all data dir contents
+chown -R 10000:10000 /root/.hermes/
+
+# Start the gateway service (registered but not started on fresh install)
+docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
+
 echo "=== Setup complete ==="
