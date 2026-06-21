@@ -7,22 +7,36 @@ Hermes is a self-improving AI agent with persistent memory, skills, and multi-pl
 ## Architecture
 
 ```mermaid
-graph TD
-    subgraph Hetzner VPS
+graph TB
+    User((User))
+
+    User -->|Discord / Email| GW
+    User -->|SSH tunnel| DB
+
+    subgraph VPS[Hetzner VPS]
         subgraph Docker
             GW[Gateway - s6]
             DB[Dashboard :9119]
         end
-        GW --- Discord
-        GW --- Email
-        GW --- Cron
-        REPO["/opt/hermes-deploy<br/>(this repo)"]
-        HERMES["/opt/hermes<br/>(hermes-agent source)"]
-        DATA["~/.hermes<br/>(persistent data)"]
+
+        subgraph Services[Gateway services]
+            Discord
+            Email
+            Cron
+        end
+
+        subgraph Filesystem
+            REPO["/opt/hermes-deploy<br/>(this repo)"]
+            HERMES["/opt/hermes<br/>(hermes-agent)"]
+            DATA["~/.hermes<br/>(persistent data)"]
+        end
+
+        GW --> Discord
+        GW --> Email
+        GW --> Cron
     end
+
     GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4-flash, gemma4, etc.)"]
-    User -->|SSH tunnel| DB
-    User -->|Discord / Email| GW
 ```
 
 ## Profiles
