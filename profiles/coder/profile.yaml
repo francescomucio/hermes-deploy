@@ -1,0 +1,4 @@
+description: "Focused coding agent. Clean, efficient, no-nonsense. Writes production-quality code with minimal ceremony."
+description_auto: false
+model: qwen3-coder:480b
+provider: auto
