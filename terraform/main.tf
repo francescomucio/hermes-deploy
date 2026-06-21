@@ -55,6 +55,20 @@ resource "hcloud_server" "hermes" {
   user_data = templatefile("${path.module}/cloud-init.yaml", {
     deploy_public_key = var.deploy_public_key
   })
+
+  # Backup before destroy (skip with: terraform destroy -var='skip_pre_destroy_backup=true')
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "if command -v rclone &> /dev/null && [ -f /usr/local/bin/hermes-backup ]; then echo '=== Pre-destroy backup ===' && /usr/local/bin/hermes-backup && echo '=== Backup complete ==='; else echo 'Backup not configured, skipping'; fi"
+    ]
+    connection {
+      type        = "ssh"
+      host        = self.ipv4_address
+      user        = "root"
+      private_key = var.deploy_key
+    }
+  }
 }
 
 # Render config files with secrets (gitignored)
