@@ -12,10 +12,6 @@ Must be done in this order:
    - `null_resource` with `remote-exec` for profile deployment (symlinks, SOUL.md)
 4. **Test redeploy** — `terraform apply` to validate. Server rebuilds but data survives on the volume.
 
-## Blocked
-
-- **R2 remote state** — Cloudflare TLS cert provisioning is broken (not just us, multiple accounts affected). Config is ready in `main.tf` (commented out). Uncomment and run `terraform init -migrate-state` when resolved.
-
 ## Done
 
 - [x] Terraform setup on Hetzner
@@ -25,8 +21,9 @@ Must be done in this order:
 - [x] Email reading via himalaya (multi-account)
 - [x] Timezone configuration
 - [x] Deploy key for self-modification (git push)
-- [x] Profile symlinks (repo edits are instantly live)
+- [x] Self-management: Claudiano can edit profiles, copy to live, commit and push
 - [x] Deploy repo mounted in container
 - [x] README with fork workflow, troubleshooting, model guide
 - [x] Dual-gateway fix (s6 + CMD conflict)
 - [x] Dashboard tunnel (port 9119)
+- [x] R2 remote state (Cloudflare EU bucket)
