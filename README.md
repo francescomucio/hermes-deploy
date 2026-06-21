@@ -332,6 +332,23 @@ The dashboard is on port **9119** (not 7860):
 ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 ```
 
+### Restoring from backup
+
+On a fresh deploy, the setup script automatically restores from the latest R2 backup if one exists. To restore manually:
+
+```bash
+ssh root@$(terraform output -raw server_ip)
+/tmp/restore-backup.sh
+```
+
+Or manually with rclone:
+
+```bash
+rclone copy r2:hermes-backups/latest/ /root/.hermes/ --transfers 4
+chown -R 10000:10000 /root/.hermes/
+cd /opt/hermes && docker compose restart gateway
+```
+
 ### Gateway not starting after deploy
 
 If Discord doesn't connect, the gateway service may need a manual start:

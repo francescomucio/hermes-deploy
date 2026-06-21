@@ -133,6 +133,16 @@ resource "null_resource" "hermes_setup" {
   provisioner "remote-exec" {
     inline = ["chmod +x /tmp/setup-hermes.sh && /tmp/setup-hermes.sh"]
   }
+
+  # Restore from R2 backup if volume is empty (fresh deploy)
+  provisioner "file" {
+    source      = "${path.module}/scripts/restore-backup.sh"
+    destination = "/tmp/restore-backup.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/restore-backup.sh && /tmp/restore-backup.sh"]
+  }
 }
 
 # Profile deployment: SOUL.md, himalaya config
