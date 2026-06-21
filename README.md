@@ -6,30 +6,23 @@ Hermes is a self-improving AI agent with persistent memory, skills, and multi-pl
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│  Hetzner VPS (Ubuntu 24.04)                 │
-│                                             │
-│  ┌─────────────────────────────────────┐    │
-│  │  Docker                             │    │
-│  │  ┌──────────┐  ┌────────────────┐   │    │
-│  │  │ Gateway  │  │   Dashboard    │   │    │
-│  │  │ (s6)     │  │   :9119       │   │    │
-│  │  │          │  │               │   │    │
-│  │  │ Discord  │  └────────────────┘   │    │
-│  │  │ Email    │                       │    │
-│  │  │ Cron     │                       │    │
-│  │  └──────────┘                       │    │
-│  └─────────────────────────────────────┘    │
-│                                             │
-│  /opt/hermes-deploy  ← this repo (git)      │
-│  /opt/hermes         ← hermes-agent source  │
-│  ~/.hermes           ← persistent data      │
-└─────────────────────────────────────────────┘
-         │
-         │ Ollama Cloud API
-         ▼
-    LLM (deepseek-v4-flash, gemma4, etc.)
+```mermaid
+graph TD
+    subgraph Hetzner VPS
+        subgraph Docker
+            GW[Gateway - s6]
+            DB[Dashboard :9119]
+        end
+        GW --- Discord
+        GW --- Email
+        GW --- Cron
+        REPO["/opt/hermes-deploy<br/>(this repo)"]
+        HERMES["/opt/hermes<br/>(hermes-agent source)"]
+        DATA["~/.hermes<br/>(persistent data)"]
+    end
+    GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4-flash, gemma4, etc.)"]
+    User -->|SSH tunnel| DB
+    User -->|Discord / Email| GW
 ```
 
 ## Profiles
