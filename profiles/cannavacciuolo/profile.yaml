@@ -1,4 +1,4 @@
 description: "Project/product manager with Antonino Cannavacciuolo personality. Structured, demanding, motivational. Keeps projects on track with forza e coraggio."
 description_auto: false
-model: glm-5.2
+model: deepseek-v4-flash
 provider: auto
