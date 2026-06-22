@@ -59,6 +59,13 @@ variable "discord_allowed_users" {
   default     = ""
 }
 
+variable "researcher_discord_bot_token" {
+  description = "Discord bot token for the researcher (Barbero) profile"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "deploy_key" {
   description = "SSH private key for pushing to the deploy repo from the server"
   type        = string

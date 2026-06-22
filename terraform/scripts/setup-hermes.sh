@@ -175,10 +175,25 @@ SYNC_CRON="*/5 * * * * /usr/local/bin/hermes-sync"
 # Copy .env to data dir (Hermes reads config from here)
 cp /opt/hermes/.env /root/.hermes/.env
 
+# Set up researcher profile Discord bot (if token provided)
+if [ -n "$RESEARCHER_DISCORD_BOT_TOKEN" ]; then
+  mkdir -p /root/.hermes/profiles/researcher
+  cat > /root/.hermes/profiles/researcher/.env <<EOF
+DISCORD_BOT_TOKEN=$RESEARCHER_DISCORD_BOT_TOKEN
+DISCORD_ALLOWED_USERS=$DISCORD_ALLOWED_USERS
+OLLAMA_API_KEY=$OLLAMA_API_KEY
+OLLAMA_BASE_URL=https://ollama.com/v1
+EOF
+  chown -R 10000:10000 /root/.hermes/profiles/researcher/.env
+fi
+
 # Fix ownership on all data dir contents
 chown -R 10000:10000 /root/.hermes/
 
-# Start the gateway service (registered but not started on fresh install)
+# Start gateway services (registered but not started on fresh install)
 docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
+if [ -n "$RESEARCHER_DISCORD_BOT_TOKEN" ]; then
+  docker exec hermes /command/s6-svc -u /run/service/gateway-researcher 2>/dev/null || true
+fi
 
 echo "=== Setup complete ==="

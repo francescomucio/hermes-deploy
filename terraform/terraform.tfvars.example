@@ -1,6 +1,5 @@
 hetzner_token         = "your-hetzner-api-token"
 ssh_public_key        = "ssh-ed25519 AAAA... your-key"
-ssh_private_key_path  = "~/.ssh/id_ed25519"
 server_type           = "cx22"
 location              = "nbg1"
 user_timezone         = "Europe/Berlin"
@@ -9,6 +8,8 @@ ollama_api_key        = "your-ollama-api-key"
 ollama_model          = "deepseek-v4-flash"
 discord_bot_token     = "your-discord-bot-token"
 discord_allowed_users = "your-discord-user-id"
+researcher_discord_bot_token = ""  # optional: separate Discord bot for researcher profile
+deploy_public_key     = "ssh-ed25519 AAAA... your-deploy-public-key"
 deploy_key            = <<-EOK
 -----BEGIN OPENSSH PRIVATE KEY-----
 your-deploy-key-here
