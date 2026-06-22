@@ -175,25 +175,38 @@ SYNC_CRON="*/5 * * * * /usr/local/bin/hermes-sync"
 # Copy .env to data dir (Hermes reads config from here)
 cp /opt/hermes/.env /root/.hermes/.env
 
-# Set up researcher profile Discord bot (if token provided)
-if [ -n "$RESEARCHER_DISCORD_BOT_TOKEN" ]; then
-  mkdir -p /root/.hermes/profiles/researcher
-  cat > /root/.hermes/profiles/researcher/.env <<EOF
-DISCORD_BOT_TOKEN=$RESEARCHER_DISCORD_BOT_TOKEN
-DISCORD_ALLOWED_USERS=$DISCORD_ALLOWED_USERS
-OLLAMA_API_KEY=$OLLAMA_API_KEY
-OLLAMA_BASE_URL=https://ollama.com/v1
-EOF
-  chown -R 10000:10000 /root/.hermes/profiles/researcher/.env
-fi
+# Set up per-profile Discord bots (from PROFILE_DISCORD_TOKENS map)
+echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
+import sys, json, os
+tokens = json.loads(sys.stdin.read())
+for profile, token in tokens.items():
+    if not token:
+        continue
+    profile_dir = f'/root/.hermes/profiles/{profile}'
+    os.makedirs(profile_dir, exist_ok=True)
+    env_path = f'{profile_dir}/.env'
+    with open(env_path, 'w') as f:
+        f.write(f'DISCORD_BOT_TOKEN={token}\n')
+        f.write(f'DISCORD_ALLOWED_USERS={os.environ[\"DISCORD_ALLOWED_USERS\"]}\n')
+        f.write(f'OLLAMA_API_KEY={os.environ[\"OLLAMA_API_KEY\"]}\n')
+        f.write(f'OLLAMA_BASE_URL=https://ollama.com/v1\n')
+    os.system(f'chown -R 10000:10000 {env_path}')
+    print(f'  Configured Discord bot for profile: {profile}')
+"
 
 # Fix ownership on all data dir contents
 chown -R 10000:10000 /root/.hermes/
 
 # Start gateway services (registered but not started on fresh install)
 docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
-if [ -n "$RESEARCHER_DISCORD_BOT_TOKEN" ]; then
-  docker exec hermes /command/s6-svc -u /run/service/gateway-researcher 2>/dev/null || true
-fi
+echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
+import sys, json, os
+tokens = json.loads(sys.stdin.read())
+for profile, token in tokens.items():
+    if not token:
+        continue
+    os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
+    print(f'  Started gateway for profile: {profile}')
+"
 
 echo "=== Setup complete ==="

@@ -8,7 +8,11 @@ ollama_api_key        = "your-ollama-api-key"
 ollama_model          = "deepseek-v4-flash"
 discord_bot_token     = "your-discord-bot-token"
 discord_allowed_users = "your-discord-user-id"
-researcher_discord_bot_token = ""  # optional: separate Discord bot for researcher profile
+profile_discord_tokens = {
+  # Add Discord bot tokens for profiles that should have their own bot
+  # researcher    = "bot-token-here"
+  # cannavacciuolo = "bot-token-here"
+}
 deploy_public_key     = "ssh-ed25519 AAAA... your-deploy-public-key"
 deploy_key            = <<-EOK
 -----BEGIN OPENSSH PRIVATE KEY-----

@@ -59,11 +59,11 @@ variable "discord_allowed_users" {
   default     = ""
 }
 
-variable "researcher_discord_bot_token" {
-  description = "Discord bot token for the researcher (Barbero) profile"
-  type        = string
+variable "profile_discord_tokens" {
+  description = "Discord bot tokens per profile (profile name → token)"
+  type        = map(string)
   sensitive   = true
-  default     = ""
+  default     = {}
 }
 
 variable "deploy_key" {
