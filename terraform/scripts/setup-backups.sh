@@ -2,7 +2,9 @@
 set -uo pipefail
 
 # Load config
+set -a
 source /tmp/hermes-deploy.env
+set +a
 
 echo "=== Setting up R2 backups ==="
 

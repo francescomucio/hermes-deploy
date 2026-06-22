@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # Load config
+set -a
 source /tmp/hermes-deploy.env
+set +a
 
 echo "=== Hermes Setup ==="
 

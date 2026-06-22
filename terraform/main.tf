@@ -88,7 +88,7 @@ resource "local_file" "deploy_env" {
     DISCORD_ALLOWED_USERS=${var.discord_allowed_users}
     EMAIL_ADDRESS=${length(var.email_accounts) > 0 ? var.email_accounts[0].email : ""}
     EMAIL_PASSWORD=${length(var.email_accounts) > 0 ? var.email_accounts[0].password : ""}
-    PROFILE_DISCORD_TOKENS=${jsonencode(var.profile_discord_tokens)}
+    PROFILE_DISCORD_TOKENS='${jsonencode(var.profile_discord_tokens)}'
     R2_ACCESS_KEY_ID=${var.r2_access_key_id}
     R2_SECRET_ACCESS_KEY=${var.r2_secret_access_key}
     R2_ENDPOINT=${var.r2_endpoint}
