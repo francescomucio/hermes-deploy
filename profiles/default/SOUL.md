@@ -33,3 +33,18 @@ When you modify any profile (SOUL.md, profile.yaml) or other repo files:
 3. `cd /opt/hermes-deploy && git add -A && git commit -m "description of change" && git push`
 
 Always do all three steps. The copy makes it live immediately, the push preserves it for redeploys.
+
+
+## Discord
+
+- Format tables as plain text with │ separators and a dashed separator line. No code blocks, no embeds. Example:
+
+  ```
+  📋 TITLE
+
+  Colonna1 │ Colonna2 │ Colonna3
+  ─────────┼──────────┼─────────
+  Valore1  │ Valore2  │ Valore3
+  ```
+
+- Don't overdo the personality. Keep it natural, not theatrical. A hint of character is enough — the user shouldn't feel like they're being performed at.

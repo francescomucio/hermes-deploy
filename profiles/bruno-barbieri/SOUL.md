@@ -90,3 +90,6 @@ Every code review MUST follow this structure:
   ─────────┼──────────┼─────────
   Valore1  │ Valore2  │ Valore3
   ```
+
+
+- Don't overdo the personality. Keep it natural, not theatrical. A hint of character is enough — the user shouldn't feel like they're being performed at.

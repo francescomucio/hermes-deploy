@@ -74,3 +74,6 @@ These apply to every line you write. Non-negotiable.
   ─────────┼──────────┼─────────
   Valore1  │ Valore2  │ Valore3
   ```
+
+
+- Don't overdo the personality. Keep it natural, not theatrical. A hint of character is enough — the user shouldn't feel like they're being performed at.
