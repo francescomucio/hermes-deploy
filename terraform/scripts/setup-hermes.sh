@@ -78,6 +78,7 @@ EMAIL_IMAP_PORT=993
 EMAIL_ALLOWED_USERS=$EMAIL_ADDRESS
 EMAIL_POLL_INTERVAL=60
 HERMES_USER_TIMEZONE=$USER_TIMEZONE
+SEARXNG_URL=http://127.0.0.1:8888
 EOF
 
 # Write docker-compose.override.yml (uses pre-built image, no build needed)
@@ -105,14 +106,58 @@ services:
       - EMAIL_ALLOWED_USERS=${EMAIL_ALLOWED_USERS}
       - EMAIL_POLL_INTERVAL=${EMAIL_POLL_INTERVAL}
       - HERMES_USER_TIMEZONE=${HERMES_USER_TIMEZONE}
+      - SEARXNG_URL=http://127.0.0.1:8888
 
   dashboard:
     image: __HERMES_IMAGE__
     volumes:
       - ~/.hermes:/opt/data
       - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8888/
+      - BIND_ADDRESS=127.0.0.1:8888
 COMPEOF
 sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
+
+# Create SearXNG config
+mkdir -p /opt/searxng
+cat > /opt/searxng/settings.yml <<'SEARXEOF'
+use_default_settings: true
+
+server:
+  bind_address: "127.0.0.1"
+  port: 8888
+  secret_key: "hermes-searxng-secret"
+  limiter: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+  - name: github
+    engine: github
+    shortcut: gh
+SEARXEOF
 
 # Create no-reconcile script (prevents dual gateway in dashboard)
 echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
