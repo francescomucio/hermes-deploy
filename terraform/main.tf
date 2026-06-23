@@ -79,6 +79,7 @@ resource "local_file" "deploy_env" {
   filename        = "${path.module}/.rendered/hermes-deploy.env"
   file_permission = "0600"
   content         = <<-EOF
+    HERMES_IMAGE_TAG=${var.hermes_image_tag}
     DEPLOY_REPO=${var.deploy_repo}
     DEPLOY_KEY=${jsonencode(var.deploy_key)}
     USER_TIMEZONE=${var.user_timezone}

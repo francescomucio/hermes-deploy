@@ -132,14 +132,17 @@ cd /opt/hermes-deploy && git log --oneline -5
 
 ## Update Hermes
 
-Pull the latest Docker image and restart:
-```bash
-cd /opt/hermes && docker compose pull && docker compose down && docker compose up -d
-```
+The Hermes Docker image version is pinned in `terraform.tfvars` as `hermes_image_tag`. To update:
 
-Wait for initialization, then start the gateway:
+1. Check available versions: https://hub.docker.com/r/nousresearch/hermes-agent/tags
+2. Update `hermes_image_tag` in tfvars on the local machine
+3. Run `terraform apply` — this re-runs the setup script with the new image
+
+Do NOT update the image manually on the server — Terraform manages it.
+
+Check current version:
 ```bash
-sleep 15 && docker exec hermes /command/s6-svc -u /run/service/gateway-default
+docker exec hermes hermes --version
 ```
 
 ## Important Notes

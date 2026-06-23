@@ -15,8 +15,8 @@ if [ ! -d /opt/hermes ]; then
 fi
 
 # Pull pre-built Docker image (skip ~10 min build)
-echo "Pulling pre-built Hermes image..."
-docker pull nousresearch/hermes-agent:latest
+echo "Pulling Hermes image: nousresearch/hermes-agent:$HERMES_IMAGE_TAG"
+docker pull "nousresearch/hermes-agent:$HERMES_IMAGE_TAG"
 
 # Set up deploy key (stored with \n escapes in env file)
 mkdir -p /root/.ssh
@@ -81,10 +81,11 @@ HERMES_USER_TIMEZONE=$USER_TIMEZONE
 EOF
 
 # Write docker-compose.override.yml (uses pre-built image, no build needed)
-cat > /opt/hermes/docker-compose.override.yml <<'EOF'
+HERMES_IMAGE="nousresearch/hermes-agent:$HERMES_IMAGE_TAG"
+cat > /opt/hermes/docker-compose.override.yml <<'COMPEOF'
 services:
   gateway:
-    image: nousresearch/hermes-agent:latest
+    image: __HERMES_IMAGE__
     command: ["sleep", "infinity"]
     volumes:
       - ~/.hermes:/opt/data
@@ -106,7 +107,9 @@ services:
       - HERMES_USER_TIMEZONE=${HERMES_USER_TIMEZONE}
 
   dashboard:
-    image: nousresearch/hermes-agent:latest
+    image: __HERMES_IMAGE__
+COMPEOF
+sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
     volumes:
       - ~/.hermes:/opt/data
       - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro

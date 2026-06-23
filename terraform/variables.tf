@@ -40,6 +40,12 @@ variable "ollama_api_key" {
   sensitive   = true
 }
 
+variable "hermes_image_tag" {
+  description = "Docker image tag for nousresearch/hermes-agent (e.g. v2026.6.19, latest)"
+  type        = string
+  default     = "v2026.6.19"
+}
+
 variable "ollama_model" {
   description = "Ollama model to use"
   type        = string
