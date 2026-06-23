@@ -203,16 +203,25 @@ for profile, token in tokens.items():
 # Fix ownership on all data dir contents
 chown -R 10000:10000 /root/.hermes/
 
-# Start gateway services (registered but not started on fresh install)
+# Start gateway services: only profiles with tokens, stop the rest
 docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
 echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
-import sys, json, os
+import sys, json, os, subprocess
+
 tokens = json.loads(sys.stdin.read())
-for profile, token in tokens.items():
-    if not token:
-        continue
-    os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
-    print(f'  Started gateway for profile: {profile}')
+profiles_with_tokens = {p for p, t in tokens.items() if t}
+
+# List all gateway services
+result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/run/service/'], capture_output=True, text=True)
+all_gateways = [d.replace('gateway-', '') for d in result.stdout.split() if d.startswith('gateway-') and d != 'gateway-default' and '/log' not in d]
+
+for profile in all_gateways:
+    if profile in profiles_with_tokens:
+        os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
+        print(f'  Started gateway: {profile}')
+    else:
+        os.system(f'docker exec hermes /command/s6-svc -d /run/service/gateway-{profile} 2>/dev/null || true')
+        print(f'  Stopped gateway (no token): {profile}')
 "
 
 echo "=== Setup complete ==="
