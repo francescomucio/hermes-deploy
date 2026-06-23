@@ -108,12 +108,11 @@ services:
 
   dashboard:
     image: __HERMES_IMAGE__
-COMPEOF
-sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
     volumes:
       - ~/.hermes:/opt/data
       - /root/no-reconcile.sh:/etc/cont-init.d/02-reconcile-profiles:ro
-EOF
+COMPEOF
+sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
 
 # Create no-reconcile script (prevents dual gateway in dashboard)
 echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
