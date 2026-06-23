@@ -8,3 +8,7 @@ model:
   base_url: https://ollama.com/v1
 toolsets:
   - kanban
+auxiliary:
+  vision:
+    model: deepseek-v4-flash
+    provider: auto
