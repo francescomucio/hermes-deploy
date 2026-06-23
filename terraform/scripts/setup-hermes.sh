@@ -174,6 +174,10 @@ chmod +x /usr/local/bin/hermes-sync
 SYNC_CRON="*/5 * * * * /usr/local/bin/hermes-sync"
 (crontab -l 2>/dev/null | grep -v hermes-sync; echo "$SYNC_CRON") | crontab -
 
+# Sandbox cleanup cron (tirith dirs fill /tmp fast)
+CLEANUP_CRON='0 * * * * docker exec hermes find /tmp -maxdepth 1 -name "tirith-install-*" -type d -mmin +60 -exec rm -rf {} + 2>/dev/null'
+(crontab -l 2>/dev/null | grep -v tirith; echo "$CLEANUP_CRON") | crontab -
+
 # Copy .env to data dir (Hermes reads config from here)
 cp /opt/hermes/.env /root/.hermes/.env
 
