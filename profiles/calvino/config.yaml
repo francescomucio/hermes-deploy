@@ -1,0 +1,6 @@
+model:
+  default: glm-5.2
+  provider: auto
+  base_url: https://ollama.com/v1
+toolsets:
+  - kanban

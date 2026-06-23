@@ -1,0 +1,10 @@
+onboarding:
+  seen:
+    profile_build_offered: true
+    busy_input_prompt: true
+model:
+  default: glm-5.2
+  provider: auto
+  base_url: https://ollama.com/v1
+toolsets:
+  - kanban

@@ -1,0 +1,5 @@
+model:
+  default: kimi-k2.7-code
+  provider: auto
+toolsets:
+  - kanban

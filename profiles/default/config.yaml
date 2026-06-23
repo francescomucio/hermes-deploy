@@ -1,0 +1,5 @@
+model:
+  default: deepseek-v4-flash
+  provider: auto
+toolsets:
+  - kanban

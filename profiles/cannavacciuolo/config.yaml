@@ -1,0 +1,10 @@
+model:
+  default: deepseek-v4-flash
+  provider: auto
+  base_url: https://ollama.com/v1
+onboarding:
+  seen:
+    profile_build_offered: true
+    busy_input_prompt: true
+toolsets:
+  - kanban
