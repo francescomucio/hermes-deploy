@@ -78,7 +78,7 @@ EMAIL_IMAP_PORT=993
 EMAIL_ALLOWED_USERS=$EMAIL_ADDRESS
 EMAIL_POLL_INTERVAL=60
 HERMES_USER_TIMEZONE=$USER_TIMEZONE
-SEARXNG_URL=http://127.0.0.1:8888
+SEARXNG_URL=http://127.0.0.1:8080
 EOF
 
 # Write docker-compose.override.yml (uses pre-built image, no build needed)
@@ -106,7 +106,7 @@ services:
       - EMAIL_ALLOWED_USERS=${EMAIL_ALLOWED_USERS}
       - EMAIL_POLL_INTERVAL=${EMAIL_POLL_INTERVAL}
       - HERMES_USER_TIMEZONE=${HERMES_USER_TIMEZONE}
-      - SEARXNG_URL=http://127.0.0.1:8888
+      - SEARXNG_URL=http://127.0.0.1:8080
 
   dashboard:
     image: __HERMES_IMAGE__
@@ -122,8 +122,7 @@ services:
     volumes:
       - /opt/searxng:/etc/searxng
     environment:
-      - SEARXNG_BASE_URL=http://127.0.0.1:8888/
-      - BIND_ADDRESS=127.0.0.1:8888
+      - SEARXNG_BASE_URL=http://127.0.0.1:8080/
 COMPEOF
 sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
 
@@ -133,8 +132,6 @@ cat > /opt/searxng/settings.yml <<'SEARXEOF'
 use_default_settings: true
 
 server:
-  bind_address: "127.0.0.1"
-  port: 8888
   secret_key: "hermes-searxng-secret"
   limiter: false
 
