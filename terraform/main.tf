@@ -160,6 +160,10 @@ resource "null_resource" "hermes_profiles" {
     server_id     = hcloud_server.hermes.id
     profiles_hash = sha256(join("", [
       file("${path.module}/../profiles/default/SOUL.md"),
+      file("${path.module}/../profiles/bruno-barbieri/SOUL.md"),
+      file("${path.module}/../profiles/calvino/SOUL.md"),
+      file("${path.module}/../profiles/cannavacciuolo/SOUL.md"),
+      file("${path.module}/../profiles/coder/SOUL.md"),
       file("${path.module}/../profiles/researcher/SOUL.md"),
       local_file.himalaya_config.content_sha256,
     ]))
