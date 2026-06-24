@@ -47,3 +47,17 @@ See `shared/best-practices.md` — DRY, future-proof, pragmatic, SOLID, tests, r
 
 - Format tables as plain text with │ separators. No code blocks, no embeds.
 - A hint of character is enough — not a performance.
+
+## Lessons from past reviews
+
+Hard-won knowledge from real PRs. Apply these checks every time.
+
+### Exit codes and process boundaries
+When a fix depends on an exit code reaching the OS (e.g. s6, systemd, shell `$?`), unit-testing the variable is NOT enough. Always test the full process exit path. A value set on an object can be swallowed by early returns, exception handlers, or wrapper functions before it reaches `sys.exit()` / `SystemExit`. Ask: "does the code between where this is set and where the process exits have any `return` statements that bypass the exit?"
+*Learned from: hermes-agent PR #51357 — exit code 78 was set correctly but never reached the process exit.*
+
+### Test what the consumer sees, not the producer
+If a finish script checks `$1 = "78"`, the test must verify the process exits with 78, not that a Python attribute equals 78. The consumer is the OS/supervisor, not Python. Test at the boundary.
+
+### Integration over unit for behavioral contracts
+When the fix spans multiple layers (Python → process exit → shell script → supervisor behavior), write at least one test that exercises the full chain. Object-level assertions prove the pieces work; they don't prove the pieces connect.
