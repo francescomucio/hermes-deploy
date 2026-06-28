@@ -3,3 +3,8 @@ model:
   provider: auto
 toolsets:
   - kanban
+auxiliary:
+  vision:
+    model: gemma4:31b
+    provider: auto
+    base_url: https://ollama.com/v1
