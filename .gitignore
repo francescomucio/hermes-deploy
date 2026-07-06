@@ -6,3 +6,4 @@ terraform/.terraform.lock.hcl
 .envrc
 terraform/.rendered/
 .deploy_key
+profiles/**/.env
