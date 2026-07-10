@@ -83,9 +83,15 @@ else
 fi
 
 echo "--- Backup freshness ---"
-last_backup=$(docker exec hermes cat /opt/data/.backup-status 2>/dev/null | head -c 20)
+# Reads /var/log/hermes-backup.log, not /opt/data/.backup-status: that
+# file lives inside /root/.hermes, which restore-backup.sh's rclone copy
+# overwrites from R2 on every deploy — right after a restore it reflects
+# whatever snapshot R2 had, not the true latest completion, causing a
+# false "stale" reading for up to 30 minutes after every deploy. The log
+# lives outside /root/.hermes and is never touched by the restore.
+last_backup=$(grep "backup complete" /var/log/hermes-backup.log 2>/dev/null | tail -1 | awk '{print $1}')
 if [ -z "$last_backup" ]; then
-  warn "no .backup-status file found yet (expected on a brand-new deploy)"
+  warn "no successful backup found in /var/log/hermes-backup.log yet (expected on a brand-new deploy)"
 else
   last_epoch=$(date -d "$last_backup" +%s 2>/dev/null || echo 0)
   now_epoch=$(date +%s)
