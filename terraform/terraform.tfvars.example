@@ -11,8 +11,8 @@ discord_bot_token     = "your-discord-bot-token"
 discord_allowed_users = "your-discord-user-id"
 profile_discord_tokens = {
   # Add Discord bot tokens for profiles that should have their own bot
-  # researcher    = "bot-token-here"
-  # cannavacciuolo = "bot-token-here"
+  # researcher     = "bot-token-here"
+  # bruno-barbieri = "bot-token-here"
 }
 deploy_public_key     = "ssh-ed25519 AAAA... your-deploy-public-key"
 deploy_key            = <<-EOK
