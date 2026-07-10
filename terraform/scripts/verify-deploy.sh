@@ -10,6 +10,10 @@
 # with Barbero's Reddit access drifting silently for hours.
 set -uo pipefail
 
+set -a
+source /tmp/hermes-deploy.env
+set +a
+
 FAIL=0
 WARN=0
 
@@ -31,12 +35,44 @@ for name in hermes searxng camofox-browser hermes-dashboard; do
   fi
 done
 
-echo "--- Gateway process ---"
-gw_count=$(docker exec hermes ps aux 2>/dev/null | grep "hermes gateway" | grep -v grep | wc -l)
-if [ "$gw_count" -eq 1 ]; then
-  pass "exactly 1 gateway process"
+echo "--- Gateway assignment (per profile) ---"
+# Not a blind process count — this project runs one dedicated gateway
+# process per profile that has its own Discord bot token, plus the
+# always-on "default" one sharing the main bot. The real invariant is:
+# default is up, every token-holding profile is up, and no other named
+# profile is running (if one is, it's silently sharing a token it
+# shouldn't — exactly how Cannavacciuolo kept stealing Bruno Barbieri's
+# and then Claudiano's session tonight).
+gw_list=$(docker exec hermes /opt/hermes/.venv/bin/hermes gateway list 2>/dev/null)
+gw_issues=$(echo "$gw_list" | PROFILE_DISCORD_TOKENS="$PROFILE_DISCORD_TOKENS" python3 -c "
+import json, os, re, sys
+tokens = json.loads(os.environ['PROFILE_DISCORD_TOKENS'])
+profiles_with_tokens = {p for p, t in tokens.items() if t}
+lines = sys.stdin.read().splitlines()
+seen = {}
+for line in lines:
+    m = re.match(r'\s*([✓✗])\s+(\S+)', line)
+    if not m:
+        continue
+    seen[m.group(2)] = (m.group(1) == '✓')
+
+if not seen.get('default'):
+    print('default gateway is not running')
+for profile in sorted(profiles_with_tokens):
+    if not seen.get(profile):
+        print(f'{profile} has a Discord token but its gateway is not running')
+for profile, running in sorted(seen.items()):
+    if profile == 'default' or profile in profiles_with_tokens:
+        continue
+    if running:
+        print(f'{profile} is running but has no assigned token (likely sharing another profile\'s Discord session)')
+")
+if [ -z "$gw_issues" ]; then
+  pass "gateway assignment: $(echo "$gw_list" | tr '\n' ' ')"
 else
-  fail "gateway process count is $gw_count, expected 1 (dual-gateway or crashed)"
+  while IFS= read -r issue; do
+    fail "$issue"
+  done <<< "$gw_issues"
 fi
 
 echo "--- Discord connection ---"

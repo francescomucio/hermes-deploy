@@ -195,7 +195,15 @@ tokens = json.loads(sys.stdin.read())
 profiles_with_tokens = {p for p, t in tokens.items() if t}
 
 result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/opt/data/profiles/'], capture_output=True, text=True)
-all_profiles = [p for p in result.stdout.split() if p]
+# 'default' shows up as a profiles/ subdirectory (deploy-profiles.sh
+# copies its SOUL.md/config.yaml there like any other profile), but it
+# is NOT a real gateway target the way the others are — the default
+# profile's actual home is /opt/data itself, already started explicitly
+# above. Including it here stops the main shared-token gateway right
+# after starting it (confirmed live: took the whole default gateway
+# down with a real outage) since it never appears in
+# PROFILE_DISCORD_TOKENS to begin with.
+all_profiles = [p for p in result.stdout.split() if p and p != 'default']
 
 for profile in all_profiles:
     home = f'/opt/data/profiles/{profile}'
