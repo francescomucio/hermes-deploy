@@ -147,9 +147,13 @@ engines:
   - name: google
     engine: google
     shortcut: g
-    proxies:
-      all://:
-        - socks5://127.0.0.1:1080
+  # No proxies: override here — the home-IP SOCKS5 tunnel is opt-in,
+  # started manually (`ssh -R 1080 ...`), not a standing service. Pointing
+  # this engine at 127.0.0.1:1080 unconditionally meant every query failed
+  # with a bare "proxy error" whenever the tunnel wasn't running, i.e.
+  # almost always. Tested extensively and the tunnel doesn't change
+  # Google's outcome either way (see README's "Google" section) — nothing
+  # to wire up a proxy for right now.
   # No `reddit` engine: reddit.com/search.json hard-requires an authenticated
   # session, which SearXNG's engine can't provide. Use browser_navigate with
   # the persisted Camofox Reddit login instead (see researcher/SOUL.md).

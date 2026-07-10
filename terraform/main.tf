@@ -117,7 +117,10 @@ resource "null_resource" "hermes_setup" {
   triggers = {
     server_id   = hcloud_server.hermes.id
     env_hash    = local_file.deploy_env.content_sha256
-    script_hash = filesha256("${path.module}/scripts/setup-hermes.sh")
+    script_hash = sha256(join("", [
+      file("${path.module}/scripts/setup-hermes.sh"),
+      file("${path.module}/scripts/restore-backup.sh"),
+    ]))
   }
 
   connection {
@@ -167,6 +170,7 @@ resource "null_resource" "hermes_profiles" {
       file("${path.module}/../profiles/cannavacciuolo/SOUL.md"),
       file("${path.module}/../profiles/coder/SOUL.md"),
       file("${path.module}/../profiles/researcher/SOUL.md"),
+      file("${path.module}/scripts/deploy-profiles.sh"),
       local_file.himalaya_config.content_sha256,
     ]))
   }

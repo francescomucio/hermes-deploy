@@ -78,16 +78,27 @@ docker exec hermes grep -q '^- browser$' /opt/data/config.yaml || \
   docker exec hermes sed -i '/^- hermes-cli$/a\- browser' /opt/data/config.yaml
 # Fixed Camofox identity so browser_navigate reuses the persisted Reddit
 # login (see reddit-login.py) instead of a fresh random session each task.
-# Must be applied to BOTH the root config.yaml AND any profile's own
-# config.yaml — a Hermes profile can carry its own camofox: block that
-# silently shadows the root one for that profile's tool calls. researcher's
-# profile does exactly this (with an empty user_id), which is why fixing
-# only the root config left Barbero permanently on a fresh, unauthenticated
-# session while Claudiano (no profile-level override) worked fine.
 docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/config.yaml
-if docker exec hermes test -f /opt/data/profiles/researcher/config.yaml; then
-  docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/profiles/researcher/config.yaml
-fi
+
+# A Hermes profile can carry its own FULL config.yaml that shadows the root
+# one entirely for that profile's behavior — not merged key-by-key.
+# researcher's does (a ~600-line standalone copy, not a small override),
+# which is how Barbero silently ended up on a different model/max_turns/
+# auto_thread AND an unauthenticated Camofox identity despite every
+# correction above landing correctly in the root file. Propagate the same
+# corrected values to every profile config.yaml that defines them — first
+# occurrence only, so unrelated nested keys with the same name (e.g.
+# goals.max_turns) aren't touched — so this class of drift can't recur for
+# any profile, present or future, without a manual patch each time.
+ROOT_MODEL=$(docker exec hermes sed -n '0,/^  default: /{s/^  default: //p}' /opt/data/config.yaml)
+ROOT_MAX_TURNS=$(docker exec hermes sed -n '0,/^  max_turns: /{s/^  max_turns: //p}' /opt/data/config.yaml)
+ROOT_AUTO_THREAD=$(docker exec hermes sed -n '0,/^  auto_thread: /{s/^  auto_thread: //p}' /opt/data/config.yaml)
+for pc in $(docker exec hermes sh -c 'ls /opt/data/profiles/*/config.yaml 2>/dev/null' || true); do
+  docker exec hermes sed -i "0,/^  default: /{s|^  default: .*|  default: $ROOT_MODEL|}" "$pc"
+  docker exec hermes sed -i "0,/^  max_turns: /{s|^  max_turns: .*|  max_turns: $ROOT_MAX_TURNS|}" "$pc"
+  docker exec hermes sed -i "0,/^  auto_thread: /{s|^  auto_thread: .*|  auto_thread: $ROOT_AUTO_THREAD|}" "$pc"
+  docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" "$pc"
+done
 
 # Narrow, Reddit-only credentials file for reddit-login.py — deliberately
 # NOT /tmp/hermes-deploy.env, which also holds Discord tokens, R2 keys, the

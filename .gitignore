@@ -2,6 +2,8 @@ terraform/terraform.tfvars
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
+/*.tfstate
+/*.tfstate.backup
 terraform/.terraform.lock.hcl
 .envrc
 terraform/.rendered/
