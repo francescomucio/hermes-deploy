@@ -6,6 +6,12 @@ set -a
 source /tmp/hermes-deploy.env
 set +a
 
+# hermes_profiles can trigger on its own (profiles_hash changed) without
+# hermes_setup also running, but only hermes_setup normally does the git
+# pull — without this, a profile-only edit would deploy stale content from
+# whatever /opt/hermes-deploy last had checked out.
+cd /opt/hermes-deploy && git pull
+
 echo "=== Deploying profiles ==="
 
 # Copy default SOUL.md to live location
