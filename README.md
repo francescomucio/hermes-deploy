@@ -164,6 +164,21 @@ ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 # Then open http://localhost:9119
 ```
 
+### Routing search through your home IP
+
+Google (and Reddit) sometimes block or captcha-gate the server's datacenter IP. Run this from
+your machine to open a reverse SOCKS proxy on the server, tunneled back through your own
+connection — no firewall changes or extra ports needed, since it reuses the server's existing
+sshd:
+
+```bash
+ssh -R 1080 root@$(terraform output -raw server_ip) -N
+```
+
+Leave it running while you want proxied search. SearXNG's `google` and `reddit` engines are
+configured to use `socks5h://127.0.0.1:1080` when it's up; `duckduckgo`/`wikipedia`/`github`
+are unaffected and keep working even when the tunnel isn't running.
+
 ## Choosing a Model
 
 Hermes uses [Ollama Cloud](https://ollama.com) as the LLM provider. Set `ollama_model` in `terraform.tfvars`.

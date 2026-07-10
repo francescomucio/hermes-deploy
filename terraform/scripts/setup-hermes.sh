@@ -79,6 +79,7 @@ EMAIL_ALLOWED_USERS=$EMAIL_ADDRESS
 EMAIL_POLL_INTERVAL=60
 HERMES_USER_TIMEZONE=$USER_TIMEZONE
 SEARXNG_URL=http://127.0.0.1:8080
+CAMOFOX_URL=http://127.0.0.1:9377
 EOF
 
 # Write docker-compose.override.yml (uses pre-built image, no build needed)
@@ -107,6 +108,7 @@ services:
       - EMAIL_POLL_INTERVAL=${EMAIL_POLL_INTERVAL}
       - HERMES_USER_TIMEZONE=${HERMES_USER_TIMEZONE}
       - SEARXNG_URL=http://127.0.0.1:8080
+      - CAMOFOX_URL=http://127.0.0.1:9377
 
   dashboard:
     image: __HERMES_IMAGE__
@@ -145,6 +147,15 @@ engines:
   - name: google
     engine: google
     shortcut: g
+    proxies:
+      all://:
+        - socks5://127.0.0.1:1080
+  - name: reddit
+    engine: reddit
+    shortcut: re
+    proxies:
+      all://:
+        - socks5://127.0.0.1:1080
   - name: duckduckgo
     engine: duckduckgo
     shortcut: ddg
@@ -155,6 +166,43 @@ engines:
     engine: github
     shortcut: gh
 SEARXEOF
+
+# Restart SearXNG to pick up the new settings (only this container, no
+# impact on the gateway/dashboard or Discord bot connections)
+docker restart searxng >/dev/null 2>&1 || true
+
+# Camofox: self-hosted anti-detection browser server (browser_navigate/etc.
+# tools). Own standalone container, independent of docker-compose — gateway
+# reaches it over the shared host network at 127.0.0.1:9377. Bound to
+# loopback only, not published to the internet.
+CAMOFOX_IMAGE="camofox-browser:135.0.1-x86_64"
+if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
+  echo "Camofox already installed, ensuring running..."
+  docker start camofox-browser >/dev/null 2>&1 || true
+else
+  echo "Installing Camofox browser server..."
+  if ! command -v make &> /dev/null; then
+    apt-get update -qq && apt-get install -y -qq make
+  fi
+  if [ ! -d /opt/camofox-browser ]; then
+    git clone https://github.com/jo-inc/camofox-browser /opt/camofox-browser
+    # Two known upstream bugs (Linux/Docker only, os.platform()==='linux' code
+    # path — doesn't affect macOS, which is likely why they're still open):
+    # 1. missing `await` on VirtualDisplay.get() -> DISPLAY becomes the
+    #    literal string "[object Promise]", browser fails to launch at all.
+    #    https://github.com/jo-inc/camofox-browser/issues/5643 (many dupes, unmerged)
+    # 2. explicit viewport dims send an `isMobile` field this Camoufox
+    #    version's protocol schema rejects -> every tab creation 500s.
+    #    https://github.com/jo-inc/camofox-browser/pull/6447 (unmerged)
+    # Verified locally: Google search works after this patch, real results,
+    # no CAPTCHA.
+    sed -i 's/vdDisplay = localVirtualDisplay\.get();/vdDisplay = await localVirtualDisplay.get();/' /opt/camofox-browser/server.js
+    sed -i 's/viewport: { width: 1280, height: 720 }/viewport: null/g' /opt/camofox-browser/server.js
+  fi
+  (cd /opt/camofox-browser && make build)
+  docker run -d --restart unless-stopped --name camofox-browser \
+    -p 127.0.0.1:9377:9377 "$CAMOFOX_IMAGE"
+fi
 
 # Create no-reconcile script (prevents dual gateway in dashboard)
 echo '#!/bin/sh' > /root/no-reconcile.sh && chmod +x /root/no-reconcile.sh
@@ -168,10 +216,9 @@ until docker exec hermes echo ready 2>/dev/null; do
   sleep 3
 done
 
-# Configure Hermes: model, base_url, max_turns, auto_thread
-docker exec hermes sed -i \
-  "s|default: anthropic/claude-opus-4.6|default: $OLLAMA_MODEL|; s|base_url: https://openrouter.ai/api/v1|base_url: https://ollama.com/v1|; s|auto_thread: true|auto_thread: false|; s|max_turns: 90|max_turns: 100|" \
-  /opt/data/config.yaml
+# NOTE: config.yaml corrections (model/base_url/toolsets) are applied in
+# restore-backup.sh, not here — that script's R2 restore runs after this one
+# and would silently overwrite any edits made to config.yaml at this point.
 
 # Add safe.directory for hermes user
 docker exec hermes git config --global --add safe.directory /opt/hermes-deploy

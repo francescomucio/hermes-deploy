@@ -39,12 +39,24 @@ set -euo pipefail
 BACKUP_DIR="/root/.hermes"
 BUCKET="r2:hermes-backups"
 
+# Lock shared with restore-backup.sh: skip if a backup/restore is already in
+# flight rather than racing rclone against itself (past incident: cron fired
+# a second sync while a manual one was still running, and a deploy's restore
+# raced against a cron backup — both hitting /root/.hermes concurrently).
+exec 200>/var/lock/hermes-backup.lock
+if ! flock -n 200; then
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) skipped (backup/restore already in progress)" >> /var/log/hermes-backup.log
+  exit 0
+fi
+
 # Checkpoint SQLite WAL files so all data is in the main .db before sync
 find "$BACKUP_DIR" -name "*.db" -type f 2>/dev/null | while read -r db; do
   sqlite3 "$db" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
 done
 
-# Sync data to R2 (excludes caches and temp files)
+# Sync data to R2 (excludes caches, temp files, and reproducible artifacts —
+# venvs/node_modules/build caches don't need backing up, they blow up the
+# file count and slow every sync down; ~178K files/4.5GB before this)
 rclone sync "$BACKUP_DIR" "$BUCKET/latest/" \
   --exclude "cache/**" \
   --exclude ".cache/**" \
@@ -54,6 +66,18 @@ rclone sync "$BACKUP_DIR" "$BUCKET/latest/" \
   --exclude "*.db-shm" \
   --exclude "*.db-wal" \
   --exclude "lost+found/**" \
+  --exclude "**/.venv/**" \
+  --exclude "**/venv/**" \
+  --exclude "**/__pycache__/**" \
+  --exclude "**/.ruff_cache/**" \
+  --exclude "**/.pytest_cache/**" \
+  --exclude "**/.mypy_cache/**" \
+  --exclude "**/node_modules/**" \
+  --exclude "**/.cache/**" \
+  --exclude "**/.local/share/uv/**" \
+  --exclude "lsp/**" \
+  --exclude "google-venv/**" \
+  --delete-excluded \
   --transfers 4 \
   --quiet
 
@@ -71,6 +95,11 @@ if [ "$DOW" = "7" ] && [ "$HOUR" = "03" ]; then
 fi
 
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup complete" >> /var/log/hermes-backup.log
+
+# Status file visible to Hermes profiles (BACKUP_DIR is bind-mounted into
+# containers at /opt/data) — lets Claudiano/etc check backup health without
+# needing host/Docker access.
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup complete" > "$BACKUP_DIR/.backup-status"
 BACKUPEOF
 chmod +x /usr/local/bin/hermes-backup
 

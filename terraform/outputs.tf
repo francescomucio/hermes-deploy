@@ -13,3 +13,8 @@ output "dashboard_tunnel" {
   value       = "ssh -L 9119:127.0.0.1:9119 root@${hcloud_server.hermes.ipv4_address}"
 }
 
+output "search_proxy_tunnel" {
+  description = "SSH reverse SOCKS proxy so Hermes search exits via your home IP"
+  value       = "ssh -R 1080 root@${hcloud_server.hermes.ipv4_address} -N"
+}
+
