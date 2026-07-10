@@ -125,6 +125,58 @@ if [ -f /tmp/camofox-needs-reddit-login ]; then
   rm -f /tmp/camofox-needs-reddit-login
 fi
 
+# Per-profile Discord bots (from PROFILE_DISCORD_TOKENS map). Runs here,
+# not in setup-hermes.sh, because this script's rclone copy above would
+# otherwise silently restore a removed profile's stale .env right back —
+# confirmed live: swapping which profile owns a token stopped the old
+# profile's gateway for the moment, but the restore brought its .env back
+# from an older R2 snapshot, and it reconnected with a token that had
+# since been reassigned, racing the new profile for the same Discord
+# session.
+echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
+import glob, sys, json, os
+tokens = json.loads(sys.stdin.read())
+for profile, token in tokens.items():
+    if not token:
+        continue
+    profile_dir = f'/root/.hermes/profiles/{profile}'
+    os.makedirs(profile_dir, exist_ok=True)
+    env_path = f'{profile_dir}/.env'
+    with open(env_path, 'w') as f:
+        f.write(f'DISCORD_BOT_TOKEN={token}\n')
+        f.write(f'DISCORD_ALLOWED_USERS={os.environ[\"DISCORD_ALLOWED_USERS\"]}\n')
+        f.write(f'OLLAMA_API_KEY={os.environ[\"OLLAMA_API_KEY\"]}\n')
+        f.write(f'OLLAMA_BASE_URL=https://ollama.com/v1\n')
+    os.system(f'chown -R 10000:10000 {env_path}')
+    print(f'  Configured Discord bot for profile: {profile}')
+
+for env_path in glob.glob('/root/.hermes/profiles/*/.env'):
+    profile = env_path.split('/')[-2]
+    if not tokens.get(profile):
+        os.remove(env_path)
+        print(f'  Removed stale Discord bot credentials for profile: {profile}')
+"
+
+# Start gateway services: only profiles with tokens, stop the rest
+docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
+echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
+import sys, json, os, subprocess
+
+tokens = json.loads(sys.stdin.read())
+profiles_with_tokens = {p for p, t in tokens.items() if t}
+
+result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/run/service/'], capture_output=True, text=True)
+all_gateways = [d.replace('gateway-', '') for d in result.stdout.split() if d.startswith('gateway-') and d != 'gateway-default' and '/log' not in d]
+
+for profile in all_gateways:
+    if profile in profiles_with_tokens:
+        os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
+        print(f'  Started gateway: {profile}')
+    else:
+        os.system(f'docker exec hermes /command/s6-svc -d /run/service/gateway-{profile} 2>/dev/null || true')
+        print(f'  Stopped gateway (no token): {profile}')
+"
+
 # Restart once more to pick up the corrected config
 cd /opt/hermes && docker compose restart gateway 2>/dev/null || true
 

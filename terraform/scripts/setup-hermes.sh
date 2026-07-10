@@ -358,64 +358,12 @@ CLEANUP_CRON='0 * * * * docker exec hermes find /tmp -maxdepth 1 -name "tirith-i
 # Copy .env to data dir (Hermes reads config from here)
 cp /opt/hermes/.env /root/.hermes/.env
 
-# Set up per-profile Discord bots (from PROFILE_DISCORD_TOKENS map).
-#
-# Also deletes stale .env files for profiles no longer in the map: `s6-svc
-# -d` (below) only stops a service for the current container lifetime — on
-# any later container restart (e.g. a plain `docker compose restart
-# gateway`, unrelated to this script), s6 brings every gateway-* service
-# back up from its static definition, with no memory of the earlier -d.
-# A profile whose old .env is still sitting there reconnects successfully
-# with a token that's since been reassigned elsewhere — two profiles racing
-# to hold the same Discord session, and whichever loses looks silently
-# disconnected. Removing the credentials themselves is what actually makes
-# a removed profile stay off across restarts, not just right now.
-echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
-import glob, sys, json, os
-tokens = json.loads(sys.stdin.read())
-for profile, token in tokens.items():
-    if not token:
-        continue
-    profile_dir = f'/root/.hermes/profiles/{profile}'
-    os.makedirs(profile_dir, exist_ok=True)
-    env_path = f'{profile_dir}/.env'
-    with open(env_path, 'w') as f:
-        f.write(f'DISCORD_BOT_TOKEN={token}\n')
-        f.write(f'DISCORD_ALLOWED_USERS={os.environ[\"DISCORD_ALLOWED_USERS\"]}\n')
-        f.write(f'OLLAMA_API_KEY={os.environ[\"OLLAMA_API_KEY\"]}\n')
-        f.write(f'OLLAMA_BASE_URL=https://ollama.com/v1\n')
-    os.system(f'chown -R 10000:10000 {env_path}')
-    print(f'  Configured Discord bot for profile: {profile}')
-
-for env_path in glob.glob('/root/.hermes/profiles/*/.env'):
-    profile = env_path.split('/')[-2]
-    if not tokens.get(profile):
-        os.remove(env_path)
-        print(f'  Removed stale Discord bot credentials for profile: {profile}')
-"
-
-# Fix ownership on all data dir contents
-chown -R 10000:10000 /root/.hermes/
-
-# Start gateway services: only profiles with tokens, stop the rest
-docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
-echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
-import sys, json, os, subprocess
-
-tokens = json.loads(sys.stdin.read())
-profiles_with_tokens = {p for p, t in tokens.items() if t}
-
-# List all gateway services
-result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/run/service/'], capture_output=True, text=True)
-all_gateways = [d.replace('gateway-', '') for d in result.stdout.split() if d.startswith('gateway-') and d != 'gateway-default' and '/log' not in d]
-
-for profile in all_gateways:
-    if profile in profiles_with_tokens:
-        os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
-        print(f'  Started gateway: {profile}')
-    else:
-        os.system(f'docker exec hermes /command/s6-svc -d /run/service/gateway-{profile} 2>/dev/null || true')
-        print(f'  Stopped gateway (no token): {profile}')
-"
+# NOTE: per-profile Discord bot setup (.env write/cleanup + gateway
+# start/stop) lives in restore-backup.sh, not here — same reason as the
+# config.yaml corrections: this script runs BEFORE restore-backup.sh's
+# rclone copy, so anything written here can get silently overwritten by
+# whatever profiles/*/.env the R2 backup snapshot happens to contain
+# (found this the hard way: a removed profile's stale .env came right
+# back after the restore, undoing a cleanup that ran here first).
 
 echo "=== Setup complete ==="
