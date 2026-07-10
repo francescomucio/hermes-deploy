@@ -366,6 +366,48 @@ from general search (`google`/`duckduckgo`/etc.), added so a block on the genera
 doesn't take news queries down with it. `duckduckgo`/`wikipedia`/`github` (general search) remain
 reliable fallbacks in the meantime too.
 
+### Blind and Glassdoor — solved, but needs an operator-proxied Camofox
+
+Unlike Google, these two are a genuine IP-reputation block, not a request-pattern one — confirmed
+directly: Blind returns a CloudFront-cached 403 (a static "Oops! Something went wrong" page,
+`x-cache: Error from cloudfront`) and Glassdoor returns a Cloudflare Challenge
+(`cf-mitigated: challenge`) from this server's datacenter IP, on both a plain `curl` *and* a real
+Camofox browser. Routed through the [search proxy tunnel](#search-proxy-tunnel-socks5-opt-in)
+instead, both load cleanly — but only when Camofox itself is relaunched to actually use that
+proxy, since a plain `curl` through the same tunnel still gets blocked (these sites fingerprint
+the request, not just the IP — a real browser is required either way).
+
+Camofox does **not** proxy by default (see above — the tunnel is opt-in/manual, and a Camofox
+that depends on it would break Reddit and everything else whenever the tunnel isn't running,
+which is most of the time). Enabling this is an operator action, not something Claudiano/Barbero
+can do themselves (no Docker access):
+
+```bash
+# 1. Start the tunnel from your laptop (separate terminal, leave running):
+terraform output -raw search_proxy_tunnel   # then run the printed command
+
+# 2. Recreate Camofox proxied through it (same volume, sessions/cookies preserved):
+ssh root@$(terraform output -raw server_ip)
+docker rm -f camofox-browser
+docker run -d --restart unless-stopped --name camofox-browser \
+  --network host \
+  -v /opt/camofox-data:/root/.camofox \
+  -e MAX_OLD_SPACE_SIZE=1024 \
+  -e PROXY_HOST=127.0.0.1 \
+  -e PROXY_PORT=1080 \
+  camofox-browser:<tag>   # match the currently running image tag
+
+# 3. When done, revert to the unproxied default (same command, minus the
+#    two PROXY_* lines) so Reddit/general browsing don't silently break
+#    the next time the tunnel isn't running.
+```
+
+A persisted, logged-in Blind session (Camofox userId `hermes-reddit`, same fixed identity as
+Reddit) is already set up — recovery script is `terraform/scripts/blind-login.py`
+(`blind_username`/`blind_password` in `terraform.tfvars`, same narrow-credentials-file pattern as
+Reddit). It only works while Camofox is proxied per the steps above; it detects and reports that
+clearly rather than failing confusingly if not.
+
 ## Data Persistence
 
 ```

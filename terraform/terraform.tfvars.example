@@ -29,6 +29,14 @@ r2_secret_access_key = "your-r2-secret-key"
 reddit_username = "your-reddit-username"
 reddit_password = "your-reddit-password"
 
+# Blind (teamblind.com) account for Camofox browser login (research/Barbero
+# use). Unlike Reddit, Blind also needs the operator's home-IP tunnel
+# active AND Camofox proxied through it — this is IP-reputation blocked at
+# the CDN edge (CloudFront), not just an auth wall. See README's Camofox
+# section.
+blind_username = "your-blind-account-email"
+blind_password = "your-blind-password"
+
 # force_restore defaults to false — deliberately not set here. Routine
 # `terraform apply` (config/token/script changes) skips the multi-minute R2
 # restore, since it's only needed on a genuinely fresh server. To force one

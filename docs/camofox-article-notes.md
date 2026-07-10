@@ -632,6 +632,29 @@ that made you distrust running agents with broad filesystem access."]**
 
 ---
 
+## 10.5. A later coda: the proxy conclusion needed one more nuance
+
+Part 8's "retire the proxy, it doesn't help anything" held up for weeks — until testing two more
+sites, Blind and Glassdoor, both blocked with a distinct signature from Google's: Blind returned a
+CloudFront-cached 403 (a static error page pretending to be a generic app failure), Glassdoor
+returned an explicit Cloudflare Challenge header. Neither budged when tested with a real Camofox
+browser on this server's datacenter IP. Routed through the home-IP tunnel — with Camofox actually
+relaunched to use it, not just the tunnel running — both loaded cleanly, first try.
+
+The distinction that makes both things true at once: Google's block tracked *request volume*
+(same result on every IP tried, got worse the more it was queried). Blind and Glassdoor's block
+tracks *IP reputation* (same request, different result purely based on source IP) — a genuinely
+different failure mode that happened to look identical from the outside (a 403, a block page) until
+tested properly, the same "don't guess, test" discipline from part 8 paying off a second time on a
+question that looked already answered.
+
+Net effect: the proxy conclusion gets refined, not reversed. Still not Camofox's default — a
+tunnel that's usually off would still break Reddit and everything else if baked in permanently —
+but it graduates from "confirmed useless, kept only as available infrastructure" to "genuinely
+useful for a specific, known class of site, deliberately still not automatic." The operator
+recreates Camofox proxied when needed, then reverts — a manual step, but a real capability where
+before there wasn't one.
+
 ## 11. Where things ended up
 
 - SearXNG stays the default for DuckDuckGo/Wikipedia/GitHub — fast, cheap, multi-engine

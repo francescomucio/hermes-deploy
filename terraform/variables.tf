@@ -119,6 +119,20 @@ variable "reddit_password" {
   default     = ""
 }
 
+variable "blind_username" {
+  description = "Blind (teamblind.com) account email for Camofox-based browser login (research/Barbero use)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "blind_password" {
+  description = "Blind (teamblind.com) account password for Camofox-based browser login (research/Barbero use)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "force_restore" {
   description = <<-EOT
     Force restore-backup.sh to pull the full R2 backup even on an already-

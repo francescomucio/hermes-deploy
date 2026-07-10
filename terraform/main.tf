@@ -95,6 +95,8 @@ resource "local_file" "deploy_env" {
     R2_ENDPOINT=${var.r2_endpoint}
     REDDIT_USERNAME=${var.reddit_username}
     REDDIT_PASSWORD=${var.reddit_password}
+    BLIND_USERNAME=${var.blind_username}
+    BLIND_PASSWORD=${var.blind_password}
     FORCE_RESTORE=${var.force_restore}
   EOF
 }

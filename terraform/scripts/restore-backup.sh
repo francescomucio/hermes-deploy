@@ -135,6 +135,16 @@ EOF
   chown 10000:10000 /root/.hermes/.reddit-credentials
 fi
 
+# Same narrow-file pattern for Blind (teamblind.com) — see blind-login.py.
+if [ -n "${BLIND_USERNAME:-}" ] && [ -n "${BLIND_PASSWORD:-}" ]; then
+  cat > /root/.hermes/.blind-credentials <<EOF
+BLIND_USERNAME=$BLIND_USERNAME
+BLIND_PASSWORD=$BLIND_PASSWORD
+EOF
+  chmod 600 /root/.hermes/.blind-credentials
+  chown 10000:10000 /root/.hermes/.blind-credentials
+fi
+
 # Fresh Camofox installs (marker left by setup-hermes.sh) need an initial
 # Reddit login — the credentials file above just became available.
 if [ -f /tmp/camofox-needs-reddit-login ]; then
