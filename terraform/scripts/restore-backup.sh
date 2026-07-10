@@ -125,6 +125,22 @@ if [ -f /tmp/camofox-needs-reddit-login ]; then
   rm -f /tmp/camofox-needs-reddit-login
 fi
 
+# Restart to pick up the corrected config.yaml (Hermes reads it at startup
+# only). Runs BEFORE the per-profile Discord bot block below, not after —
+# `docker compose restart gateway` resets s6's runtime service state back
+# to its static defaults, undoing any `s6-svc -d` stop from a prior run.
+# Confirmed live: with this restart last, a profile explicitly stopped
+# below would come right back up on this restart, and — without its own
+# .env, since that part of the fix does hold — silently fall back to
+# connecting on the *shared default* bot token instead, alongside
+# whichever profile already legitimately uses it. The per-profile start/
+# stop below needs to be the actual last word.
+cd /opt/hermes && docker compose restart gateway 2>/dev/null || true
+until docker exec hermes echo ready 2>/dev/null; do
+  echo "Waiting for hermes container..."
+  sleep 3
+done
+
 # Per-profile Discord bots (from PROFILE_DISCORD_TOKENS map). Runs here,
 # not in setup-hermes.sh, because this script's rclone copy above would
 # otherwise silently restore a removed profile's stale .env right back —
@@ -176,8 +192,5 @@ for profile in all_gateways:
         os.system(f'docker exec hermes /command/s6-svc -d /run/service/gateway-{profile} 2>/dev/null || true')
         print(f'  Stopped gateway (no token): {profile}')
 "
-
-# Restart once more to pick up the corrected config
-cd /opt/hermes && docker compose restart gateway 2>/dev/null || true
 
 echo "=== Restore complete ==="
