@@ -596,6 +596,34 @@ if so. This makes "just run it, it's safe" actually true rather than aspirationa
 matters a lot when the thing invoking it is an agent following a blanket instruction rather than
 a human using judgment about whether to bother.
 
+### The actual root cause of Barbero's original block, found later
+
+One loose thread from the incident above was never closed at the time: Barbero's *specific*
+claim (session expired, credentials missing) was verifiably wrong — direct checks showed the
+credentials file populated and the persisted session still valid — but *something* was still
+genuinely blocking Barbero, and that something was never identified. It surfaced again later, in
+a much clearer form: asked to test Reddit access directly, Claudiano logged in and stayed logged
+in; Barbero, on the same server, same config, same fixed-identity design, reported blocked every
+time.
+
+The cause was a layer of Hermes' own config system this project hadn't accounted for: profiles
+can carry their **own** `config.yaml`, and if a profile's file defines a `camofox:` block, it
+shadows the root `config.yaml` entirely for that profile's tool calls — not merged key-by-key,
+replaced wholesale. `profiles/researcher/config.yaml` (Barbero's) had exactly this, with
+`user_id: ''` — empty. Every fix applied earlier in this project (the `sed` correction, the
+verification checks) only ever touched the root `config.yaml`, which Claudiano (no profile-level
+override) correctly used. Barbero silently fell through Hermes' own priority chain
+(`identity_override → managed_persistence → random ephemeral session`) to a brand-new,
+unauthenticated Camofox identity on every single task — explaining both the original incident
+and every "Reddit is blocked" report since, cleanly, with no ambiguity left. Fixed by applying
+the same correction to the profile-level file too, and updating `restore-backup.sh` to keep
+correcting both going forward.
+
+The honest lesson: the earlier fix *looked* verified — the config file was checked and was
+correct — but "correct" was checked in the wrong file. Config that can be silently shadowed
+by a more specific layer needs the verification aimed at the layer that's actually read, not
+the one that's easiest to check.
+
 **[ASK: this section frames the incident as "no harm done, but the pattern was the problem" —
 is that how you read it, or did anything about Barbero's transcript feel more concerning than
 that when you saw it? Worth knowing before this becomes a paragraph in the article, since the

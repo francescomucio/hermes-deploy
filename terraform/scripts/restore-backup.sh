@@ -76,9 +76,18 @@ docker exec hermes sed -i \
   /opt/data/config.yaml
 docker exec hermes grep -q '^- browser$' /opt/data/config.yaml || \
   docker exec hermes sed -i '/^- hermes-cli$/a\- browser' /opt/data/config.yaml
-# Fixed Camofox identity so Barbero's browser_navigate reuses the persisted
-# Reddit login (see reddit-login.py) instead of a fresh random session.
+# Fixed Camofox identity so browser_navigate reuses the persisted Reddit
+# login (see reddit-login.py) instead of a fresh random session each task.
+# Must be applied to BOTH the root config.yaml AND any profile's own
+# config.yaml — a Hermes profile can carry its own camofox: block that
+# silently shadows the root one for that profile's tool calls. researcher's
+# profile does exactly this (with an empty user_id), which is why fixing
+# only the root config left Barbero permanently on a fresh, unauthenticated
+# session while Claudiano (no profile-level override) worked fine.
 docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/config.yaml
+if docker exec hermes test -f /opt/data/profiles/researcher/config.yaml; then
+  docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/profiles/researcher/config.yaml
+fi
 
 # Narrow, Reddit-only credentials file for reddit-login.py — deliberately
 # NOT /tmp/hermes-deploy.env, which also holds Discord tokens, R2 keys, the
