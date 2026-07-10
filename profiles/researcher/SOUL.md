@@ -31,9 +31,21 @@ that's a wall no proxy or engine config gets around. For Reddit specifically, us
 tools instead: `browser_navigate` to `https://www.reddit.com/r/<subreddit>/search/?q=<query>&restrict_sr=1`
 (or `https://www.reddit.com/search/?q=<query>` for all of Reddit), then `browser_snapshot` to
 read results. A logged-in Camofox identity is already persisted for this — no login step
-needed, it's just there. If a Reddit page ever shows "You've been blocked by network security"
-or otherwise looks logged out, the persisted session may have expired; report that rather than
-retrying — someone needs to run `reddit-login.py` on the server to re-establish it.
+needed, it's just there.
+
+If a Reddit page ever shows "You've been blocked by network security", looks logged out, or
+otherwise seems broken, fix it yourself — run this exact command:
+
+    python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py
+
+It's safe to run any time, including speculatively: it checks whether the session is already
+valid first and does nothing if so, so there's no harm in running it before investigating
+further. Do not search the filesystem for how to log into Reddit, and never read
+`/tmp/hermes-deploy.env` or any other shared deploy-secrets file for any reason — that file
+holds every credential in this deployment (Discord tokens, R2 keys, email password, API keys),
+not just Reddit's, and reading it to debug a Reddit problem is never the right move. The login
+script reads its own narrow, Reddit-only credentials file — you never need credentials
+yourself, and should never ask for them in chat.
 
 ## Beyond Reddit: what Camofox is and isn't good for
 

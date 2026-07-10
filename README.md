@@ -330,15 +330,25 @@ the session survives redeploys.
 
 - Credentials: `reddit_username`/`reddit_password` in `terraform.tfvars` (dedicated throwaway
   account recommended, not a personal one) — same gitignored-secrets pattern as every other
-  credential in this deploy.
-- Recovery script: `terraform/scripts/reddit-login.py`, runs automatically on a fresh Camofox
-  install, or manually via `python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py` if the
-  session ever gets invalidated. Confirmed working from the plain datacenter IP (no proxy) once
-  attempts are spaced out — see below.
+  credential in this deploy. On every deploy, `restore-backup.sh` writes them into a narrow,
+  Reddit-only file (`/root/.hermes/.reddit-credentials`, visible inside the hermes container at
+  `/opt/data/.reddit-credentials`) — deliberately separate from `/tmp/hermes-deploy.env`, which
+  holds every credential in the deployment (Discord tokens, R2 keys, email password, API keys).
+  Claudiano/Barbero are told (in their SOUL.md) to run the recovery script themselves and never
+  read the shared secrets file.
+- Recovery script: `terraform/scripts/reddit-login.py`. Runs automatically on a fresh Camofox
+  install (once the credentials file above exists). Also runnable manually, from the host or
+  from inside Claudiano/Barbero's own sandbox (same repo path is mounted in both places):
+  `python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py`. It checks whether the
+  persisted session is still valid *before* attempting anything, and exits immediately if so —
+  safe to run speculatively/repeatedly without risking extra login attempts against Reddit's
+  fraud detection.
 - If Reddit's login form shows "Something went wrong logging in," that's Reddit's login-specific
   fraud scoring reacting to repeated attempts in a short window, not a credentials/IP problem —
   confirmed by testing the same account, same IP, spaced further apart, succeeding cleanly.
-  Hammering retries risks flagging the account further; wait between attempts instead.
+  Hammering retries risks flagging the account further; wait between attempts instead. The
+  check-before-login behavior above exists specifically to avoid Claudiano/Barbero triggering
+  this by running the recovery script defensively.
 
 ### Google — not solved, don't chase it further
 

@@ -278,15 +278,12 @@ else
   CAMOFOX_FRESH_INSTALL=true
 fi
 
-# Log the fixed hermes-reddit Camofox identity into Reddit on fresh installs
-# (persistence volume means this only needs to happen once, going forward).
-# config.yaml's browser.camofox.user_id is set to the same fixed userId in
-# restore-backup.sh so Barbero's browser_navigate calls reuse this session.
-if [ "$CAMOFOX_FRESH_INSTALL" = true ] && [ -n "${REDDIT_USERNAME:-}" ]; then
-  echo "Logging Camofox into Reddit..."
-  sleep 3
-  python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py || \
-    echo "Reddit login failed — run reddit-login.py manually to retry"
+# Fresh Camofox installs need an initial Reddit login. The narrow
+# credentials file reddit-login.py reads doesn't exist yet at this point
+# in the deploy (restore-backup.sh writes it, and runs after this script),
+# so just leave a marker for restore-backup.sh to act on once it's ready.
+if [ "$CAMOFOX_FRESH_INSTALL" = true ]; then
+  touch /tmp/camofox-needs-reddit-login
 fi
 
 # Create no-reconcile script (prevents dual gateway in dashboard)

@@ -52,6 +52,18 @@ When you modify any profile (SOUL.md, profile.yaml) or other repo files:
 
 Always do all three steps. The copy makes it live immediately, the push preserves it for redeploys.
 
+### Reddit access
+
+Reddit browsing (`browser_navigate`) uses a persisted, logged-in Camofox identity. If it ever
+looks logged out or blocked, fix it yourself:
+
+    python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py
+
+Safe to run any time, including speculatively — it checks the existing session first and does
+nothing if it's still valid. Never read `/tmp/hermes-deploy.env` or any other shared
+deploy-secrets file to debug this (it holds every credential in the deployment, not just
+Reddit's); never search for how to log in — this is the command, every time.
+
 ## Discord
 
 - Format tables as plain text with │ separators and a dashed separator line. No code blocks, no embeds.

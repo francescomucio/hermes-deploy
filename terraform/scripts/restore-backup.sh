@@ -80,6 +80,31 @@ docker exec hermes grep -q '^- browser$' /opt/data/config.yaml || \
 # Reddit login (see reddit-login.py) instead of a fresh random session.
 docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/config.yaml
 
+# Narrow, Reddit-only credentials file for reddit-login.py — deliberately
+# NOT /tmp/hermes-deploy.env, which also holds Discord tokens, R2 keys, the
+# email password and API keys. Claudiano/Barbero can safely run
+# reddit-login.py themselves (it only ever reads this file), without ever
+# needing to touch the shared secrets blob. Lives in the volume so it
+# survives restarts and is visible at /opt/data/.reddit-credentials inside
+# the container as well as /root/.hermes/.reddit-credentials on the host.
+if [ -n "${REDDIT_USERNAME:-}" ] && [ -n "${REDDIT_PASSWORD:-}" ]; then
+  cat > /root/.hermes/.reddit-credentials <<EOF
+REDDIT_USERNAME=$REDDIT_USERNAME
+REDDIT_PASSWORD=$REDDIT_PASSWORD
+EOF
+  chmod 600 /root/.hermes/.reddit-credentials
+  chown 10000:10000 /root/.hermes/.reddit-credentials
+fi
+
+# Fresh Camofox installs (marker left by setup-hermes.sh) need an initial
+# Reddit login — the credentials file above just became available.
+if [ -f /tmp/camofox-needs-reddit-login ]; then
+  echo "Logging Camofox into Reddit..."
+  python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py || \
+    echo "Reddit login failed — run reddit-login.py manually to retry"
+  rm -f /tmp/camofox-needs-reddit-login
+fi
+
 # Restart once more to pick up the corrected config
 cd /opt/hermes && docker compose restart gateway 2>/dev/null || true
 

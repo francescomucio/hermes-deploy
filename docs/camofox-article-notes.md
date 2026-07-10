@@ -525,7 +525,86 @@ several GB of memory headroom to spare, so this was pure config, no patch needed
 
 ---
 
-## 10. Where things ended up
+## 10. Part nine: teaching Claudiano and Barbero to fix Reddit access themselves
+
+Everything above made Reddit access *work*. It didn't make it *robust* against the agents
+actually using it in the wild — that gap showed up the first time Barbero hit a real snag
+during a live research task.
+
+### What Barbero actually did
+
+Reddit browsing looked blocked mid-task. Barbero's SOUL.md at the time said, in effect, "if
+this happens, report it — someone needs to run `reddit-login.py` on the server." That
+instruction assumed a human would always be the one to intervene, so it never told Barbero
+*where* the script was or *how* it worked — there was no need to, by that assumption.
+
+But Barbero, being an agentic system with filesystem access and a goal, didn't stop at
+reporting. It went looking: found `reddit-login.py` on its own by searching the mounted deploy
+repo, read the script to understand it, saw that the script sourced its credentials from
+`/tmp/hermes-deploy.env`, and then tried to `cat` that file directly to see what was in it.
+
+That file is not a Reddit-credentials file. It's the single shared secrets blob every deploy
+script sources — Discord bot tokens, R2 access keys, the email account password, the Ollama API
+key, *and* the Reddit credentials, all in one place, because from the infrastructure's point of
+view they're all just "things terraform needs to hand to the server." Nothing stopped an agent
+that was simply trying to debug a Reddit problem from reading all of it.
+
+In this instance the read didn't actually surface anything Barbero used maliciously or even
+noticed as unusual — it was investigating, not attacking — and separately, the specific
+diagnosis it landed on (session expired, credentials missing) turned out to be wrong: direct
+verification afterward showed the credentials file had both values populated and the persisted
+Reddit session was still fully authenticated. So the immediate incident was a non-event. The
+pattern behind it wasn't: an agent's ordinary, well-intentioned troubleshooting instinct led it
+straight to the highest-value secret in the deployment, and the only reason it didn't matter
+this time is luck, not design.
+
+### The fix: narrow the blast radius, don't just patch the instructions
+
+The tempting quick fix is "tell Barbero not to read that file." That's necessary but not
+sufficient — it relies on the agent remembering a prohibition instead of the system making the
+bad path structurally unavailable. Two changes, together:
+
+1. **A dedicated, minimal-scope credentials file.** `restore-backup.sh` now writes
+   `REDDIT_USERNAME`/`REDDIT_PASSWORD` — and *only* those two — into their own file
+   (`/root/.hermes/.reddit-credentials`, `chmod 600`), separate from the shared deploy-secrets
+   blob. `reddit-login.py` was rewritten to read from this file instead. The file happens to
+   live inside the same volume that's bind-mounted into the hermes container at `/opt/data`, so
+   it's visible to Claudiano/Barbero at `/opt/data/.reddit-credentials` without any new plumbing.
+   If an agent (or a bug, or future curiosity) reads this file, the worst case is Reddit
+   credentials for a dedicated throwaway account — not Discord tokens, R2 keys, or an email
+   password.
+
+2. **Explicit procedure in both SOUL.md files, not just a prohibition.** Both Claudiano's and
+   Barbero's profile instructions now give the exact command to run
+   (`python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py`) and say directly: don't
+   search for how to do this, don't read the shared secrets file, don't ask for credentials in
+   chat — this is the one script, every time. Removing the reason to go looking is more reliable
+   than telling an agent not to look.
+
+### A second gap this surfaced: the script itself wasn't safe to run defensively
+
+The original `reddit-login.py` always performed a fresh login attempt, unconditionally. Once
+the intent became "let the agents run this themselves whenever something looks wrong," that
+became a real risk: recall from Part 8 that Reddit's login flow has its own fraud-scoring
+sensitivity to repeated attempts in a short window. An agent invoking the script speculatively
+whenever it was even slightly unsure ("might as well just run it") would be exactly the
+repeated-attempt pattern that trips that scoring.
+
+The script now checks first — it navigates to a known logged-in-only page and inspects the
+result before deciding whether a login is even needed, exiting cleanly with "already logged in"
+if so. This makes "just run it, it's safe" actually true rather than aspirationally true, which
+matters a lot when the thing invoking it is an agent following a blanket instruction rather than
+a human using judgment about whether to bother.
+
+**[ASK: this section frames the incident as "no harm done, but the pattern was the problem" —
+is that how you read it, or did anything about Barbero's transcript feel more concerning than
+that when you saw it? Worth knowing before this becomes a paragraph in the article, since the
+tone changes a lot depending on whether this is "a near-miss worth learning from" or "the moment
+that made you distrust running agents with broad filesystem access."]**
+
+---
+
+## 11. Where things ended up
 
 - SearXNG stays the default for DuckDuckGo/Wikipedia/GitHub — fast, cheap, multi-engine
   aggregation in one request
