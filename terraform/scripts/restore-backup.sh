@@ -8,24 +8,42 @@ set +a
 
 echo "=== Restoring from R2 backup ==="
 
-# Lock shared with hermes-backup: wait for any in-flight backup upload to
-# finish (and block new ones) before touching /root/.hermes, so restore and
-# backup never race against each other.
-exec 200>/var/lock/hermes-backup.lock
-if ! flock -w 300 200; then
-  echo "Could not acquire backup lock within 5 minutes — a backup/restore is stuck. Aborting."
-  exit 1
-fi
+# The R2 restore (rclone copy of the whole /root/.hermes tree — sessions,
+# logs, profile data) is the single biggest cost of every deploy, often
+# 5+ minutes on its own, dominated by per-object API overhead across
+# thousands of small files rather than actual data volume. It's only
+# genuinely needed once: populating a brand-new server. On an
+# already-provisioned server, the live filesystem IS the current state —
+# restoring FROM the backup INTO it on every routine apply (a token
+# swap, a config tweak, a script fix) doesn't accomplish anything except
+# cost several minutes, since cron backs up the live state every 30 min
+# regardless. Skipped by default once a server looks provisioned;
+# force it back on for a genuine one-off (disaster recovery, suspected
+# local corruption) with `terraform apply -var="force_restore=true"` —
+# deliberately not something to leave set in tfvars, or every future
+# apply would pay this cost again for no reason.
+if [ -f /root/.hermes/config.yaml ] && [ "${FORCE_RESTORE:-false}" != "true" ]; then
+  echo "Server already provisioned and force_restore not set — skipping R2 restore."
+  echo "(pass -var=\"force_restore=true\" to terraform apply to force one anyway)"
+else
+  # Lock shared with hermes-backup: wait for any in-flight backup upload to
+  # finish (and block new ones) before touching /root/.hermes, so restore
+  # and backup never race against each other.
+  exec 200>/var/lock/hermes-backup.lock
+  if ! flock -w 300 200; then
+    echo "Could not acquire backup lock within 5 minutes — a backup/restore is stuck. Aborting."
+    exit 1
+  fi
 
-# Install rclone if not present
-if ! command -v rclone &> /dev/null; then
-  echo "Installing rclone..."
-  curl -s https://rclone.org/install.sh | bash
-fi
+  # Install rclone if not present
+  if ! command -v rclone &> /dev/null; then
+    echo "Installing rclone..."
+    curl -s https://rclone.org/install.sh | bash
+  fi
 
-# Configure rclone for R2
-mkdir -p /root/.config/rclone
-cat > /root/.config/rclone/rclone.conf <<EOF
+  # Configure rclone for R2
+  mkdir -p /root/.config/rclone
+  cat > /root/.config/rclone/rclone.conf <<EOF
 [r2]
 type = s3
 provider = Cloudflare
@@ -36,26 +54,27 @@ acl = private
 no_check_bucket = true
 EOF
 
-# Check if backup exists
-BACKUP_SIZE=$(rclone size r2:hermes-backups/latest/ 2>/dev/null | grep "Total size" || echo "")
-if [ -z "$BACKUP_SIZE" ]; then
-  echo "No backup found in r2:hermes-backups/latest/"
-  echo "Skipping restore — starting fresh."
-else
-  echo "Found backup: $BACKUP_SIZE"
+  # Check if backup exists
+  BACKUP_SIZE=$(rclone size r2:hermes-backups/latest/ 2>/dev/null | grep "Total size" || echo "")
+  if [ -z "$BACKUP_SIZE" ]; then
+    echo "No backup found in r2:hermes-backups/latest/"
+    echo "Skipping restore — starting fresh."
+  else
+    echo "Found backup: $BACKUP_SIZE"
 
-  # Stop containers before restore
-  cd /opt/hermes && docker compose stop gateway 2>/dev/null || true
+    # Stop containers before restore
+    cd /opt/hermes && docker compose stop gateway 2>/dev/null || true
 
-  # Restore from R2 to the volume
-  echo "Restoring data..."
-  rclone copy r2:hermes-backups/latest/ /root/.hermes/ \
-    --transfers 4
+    # Restore from R2 to the volume
+    echo "Restoring data..."
+    rclone copy r2:hermes-backups/latest/ /root/.hermes/ \
+      --transfers 4
 
-  # Fix ownership
-  chown -R 10000:10000 /root/.hermes/
+    # Fix ownership
+    chown -R 10000:10000 /root/.hermes/
 
-  echo "Restored: $BACKUP_SIZE"
+    echo "Restored: $BACKUP_SIZE"
+  fi
 fi
 
 # Gateway may be stopped (restore path above) or already running (fresh

@@ -471,16 +471,24 @@ ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 
 ### Restoring from backup
 
-On a fresh deploy, the setup script automatically restores from the latest R2 backup if one exists. To restore manually:
+A brand-new server automatically restores from the latest R2 backup on first deploy. On an
+*already-provisioned* server, `terraform apply` skips this — it's the single biggest cost of a
+deploy (often 5+ minutes, dominated by per-object overhead across thousands of small files, not
+actual data volume), and on a live server the restore has nothing to accomplish that cron's own
+30-minute backup cycle doesn't already handle. Force it anyway for a genuine one-off (disaster
+recovery, suspected local corruption):
+
+```bash
+terraform apply -var="force_restore=true"
+```
+
+Deliberately a CLI flag, not a `terraform.tfvars` entry — set there, it would force a restore on
+every future apply too.
+
+To restore manually without going through Terraform at all:
 
 ```bash
 ssh root@$(terraform output -raw server_ip)
-/tmp/restore-backup.sh
-```
-
-Or manually with rclone:
-
-```bash
 rclone copy r2:hermes-backups/latest/ /root/.hermes/ --transfers 4
 chown -R 10000:10000 /root/.hermes/
 cd /opt/hermes && docker compose restart gateway
@@ -488,13 +496,27 @@ cd /opt/hermes && docker compose restart gateway
 
 ### Gateway not starting after deploy
 
-If Discord doesn't connect, the gateway service may need a manual start:
+Don't use `s6-svc -u/-d` directly — confirmed the hard way that it only changes the *current*
+container's runtime state. A boot-time hook (`container_boot.py`, wired in as
+`/etc/cont-init.d/02-reconcile-profiles`) reads each profile's persisted
+`profiles/<name>/gateway_state.json` on every container start and auto-restarts exactly the
+profiles whose `desired_state` says `"running"` — a raw `s6-svc` stop doesn't touch that field, so
+the very next restart silently undoes it. Use the CLI, which does write `desired_state` correctly:
 
 ```bash
-docker exec hermes /command/s6-svc -u /run/service/gateway-default
+docker exec hermes /opt/hermes/.venv/bin/hermes gateway start
 ```
 
-Check logs: `docker exec hermes cat /opt/data/logs/gateway.log | tail -20`
+For a named profile (not the shared default bot), point `HERMES_HOME` at its directory:
+
+```bash
+docker exec -e HERMES_HOME=/opt/data/profiles/<name> hermes /opt/hermes/.venv/bin/hermes gateway start
+```
+
+Check status for every profile at once: `docker exec hermes /opt/hermes/.venv/bin/hermes gateway list`
+
+Check logs: `docker exec hermes cat /opt/data/logs/gateway.log | tail -20` (or, for a named
+profile, `/opt/data/profiles/<name>/logs/gateway.log`)
 
 ## Costs
 

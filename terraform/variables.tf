@@ -119,6 +119,19 @@ variable "reddit_password" {
   default     = ""
 }
 
+variable "force_restore" {
+  description = <<-EOT
+    Force restore-backup.sh to pull the full R2 backup even on an already-
+    provisioned server. Default false: routine applies (token/config/script
+    changes) skip the multi-minute rclone restore, since it's only actually
+    needed on a genuinely fresh server. Set via CLI for a one-off
+    (`terraform apply -var="force_restore=true"`) rather than in tfvars —
+    leaving it true there would force a restore on every future apply too.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "email_accounts" {
   description = "Email accounts for himalaya IMAP reading"
   type = list(object({

@@ -29,6 +29,12 @@ r2_secret_access_key = "your-r2-secret-key"
 reddit_username = "your-reddit-username"
 reddit_password = "your-reddit-password"
 
+# force_restore defaults to false — deliberately not set here. Routine
+# `terraform apply` (config/token/script changes) skips the multi-minute R2
+# restore, since it's only needed on a genuinely fresh server. To force one
+# for a one-off (disaster recovery, suspected local corruption), pass it on
+# the CLI instead of setting it here: terraform apply -var="force_restore=true"
+
 email_accounts = [
   {
     name      = "gmail"
