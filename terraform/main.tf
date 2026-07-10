@@ -204,6 +204,33 @@ resource "null_resource" "hermes_profiles" {
   }
 }
 
+# Post-deploy health check: runs on every apply (always_run), fails the
+# apply loudly if anything's actually broken instead of leaving it for
+# someone to discover later via manual SSH checks.
+resource "null_resource" "hermes_verify" {
+  triggers = {
+    always_run = timestamp()
+  }
+
+  depends_on = [null_resource.hermes_setup, null_resource.hermes_profiles]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/verify-deploy.sh"
+    destination = "/tmp/verify-deploy.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/verify-deploy.sh && /tmp/verify-deploy.sh"]
+  }
+}
+
 # R2 backup: every 30 min sync of Hermes data to Cloudflare R2
 resource "null_resource" "hermes_backups" {
   triggers = {
