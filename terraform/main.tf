@@ -93,6 +93,8 @@ resource "local_file" "deploy_env" {
     R2_ACCESS_KEY_ID=${var.r2_access_key_id}
     R2_SECRET_ACCESS_KEY=${var.r2_secret_access_key}
     R2_ENDPOINT=${var.r2_endpoint}
+    REDDIT_USERNAME=${var.reddit_username}
+    REDDIT_PASSWORD=${var.reddit_password}
   EOF
 }
 

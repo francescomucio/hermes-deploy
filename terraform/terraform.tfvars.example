@@ -24,6 +24,11 @@ EOK
 r2_access_key_id     = "your-r2-access-key"
 r2_secret_access_key = "your-r2-secret-key"
 
+# Reddit account for Camofox browser login (research/Barbero use). Dedicated
+# throwaway account recommended, not a personal one.
+reddit_username = "your-reddit-username"
+reddit_password = "your-reddit-password"
+
 email_accounts = [
   {
     name      = "gmail"

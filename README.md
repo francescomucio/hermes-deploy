@@ -262,6 +262,76 @@ Replace the included profiles with your own. The `profiles/default/SOUL.md` is y
 - Add structured output formats for specialized profiles (e.g. research reports)
 - Keep it concise — the model reads this on every message
 
+## Camofox Browser Automation
+
+[Camofox](https://github.com/jo-inc/camofox-browser) is a self-hosted anti-detection browser
+server (Firefox fork with C++-level fingerprint spoofing) that gives Hermes' `browser_navigate`
+tools a real, stateful browser — used specifically for sites SearXNG's plain-HTTP engines can't
+handle: Google (CAPTCHA-gated, works via a real browser session) and Reddit (requires an
+authenticated login, not just IP reputation).
+
+Runs as its own container (`camofox-browser`), **host-networked** (`--network host`, like
+`gateway`/`searxng`, not `docker-compose.override.yml`) — required so `127.0.0.1` inside the
+container means the *host's* loopback, where both the `hermes` container's API access
+(`127.0.0.1:9377`) and the search proxy tunnel (`127.0.0.1:1080`) actually live. Bound to
+loopback only at the application level (`app.listen(PORT, '127.0.0.1', ...)`, patch #6 below) for
+defense-in-depth, since host networking removes Docker's own per-container port isolation.
+Deployed by `terraform/scripts/setup-hermes.sh`.
+
+Camofox's own outbound traffic is routed through the **search proxy tunnel** (`PROXY_HOST`/
+`PROXY_PORT` env vars) — not optional. Reddit's login flow applies much stricter fraud scoring
+than general browsing; a login from the Hetzner datacenter IP gets silently rejected
+("Something went wrong logging in") even with correct credentials, confirmed by testing both
+ways. General Google/Reddit browsing is more lenient about IP but routed through the tunnel too
+for consistency.
+
+### Upstream patches
+
+The pinned version (`135.0.1-beta.24`, the Makefile default) has real, currently-unfixed bugs on
+Linux/Docker specifically — the buggy code paths are gated behind `os.platform() === 'linux'`,
+so they likely don't show up in the maintainer's own (probably macOS-based) testing. All patches
+are applied automatically in `setup-hermes.sh`, idempotently, every time the container needs
+(re)creating — not just once at clone time, so they self-heal if `/opt/camofox-browser` already
+existed from before a patch was added. If `CAMOUFOX_VERSION`/`CAMOUFOX_RELEASE` in the Makefile
+ever get bumped, re-check whether these are still needed — an upstream fix landing would make the
+corresponding `sed` a silent no-op (fine) or, in the unlikely case upstream changes the
+surrounding code shape, a no-op that silently stops applying (re-verify manually).
+
+| # | File | Symptom | Root cause | Fix |
+|---|------|---------|------------|-----|
+| 1 | `server.js` | Every browser launch fails: `cannot open display: [object Promise]` | `VirtualDisplay.get()` is `async`, called without `await` — the Promise object gets stringified as the `DISPLAY` env var | Add `await` |
+| 2 | `server.js` (2 places) | Every tab creation fails with 500: `Browser.setDefaultViewport... property "<root>.viewport.isMobile" not described in this scheme` | Explicit `{ width: 1280, height: 720 }` viewport implicitly sends `isMobile: false`, which this Camoufox version's protocol schema rejects | `viewport: null` instead |
+| 3 | `server.js` (health probe) | Whole browser force-restarts every ~3 min, killing in-flight tabs/logins | Same root cause as #2, but in the periodic health-check's bare `newContext()` call (no explicit viewport arg at all — hits Camoufox's own default, which still carries `isMobile`) | `newContext({ viewport: null })` |
+| 4 | `lib/proxy.js` | `PROXY_HOST`/`PROXY_PORT` env vars silently don't work with a SOCKS5 proxy (e.g. the search proxy tunnel) | The proxy `server` string is hardcoded to `http://` scheme; Playwright supports `socks5://` natively but Camofox's env-var wrapper never exposed it | `socks5://` instead of `http://` |
+| 5 | `server.js` | Browser launch fails: `Failed to get a public proxy IP address from any API endpoint` whenever a proxy is set | GeoIP auto-detection (for locale/timezone/geo fingerprint matching) verifies the proxy's exit IP via 6 external lookup APIs — all unreachable through our tunnel, and Camofox treats that as fatal rather than falling back | `geoip: false` — loses automatic fingerprint geo-matching, keeps actual proxying |
+| 6 | `server.js` | N/A — defense-in-depth, not a bug | `app.listen(PORT, ...)` binds all interfaces by default; harmless under the old per-container networking but not once switched to `--network host` | Bind explicitly to `127.0.0.1` |
+
+Upstream tracking: #1 has [many open, unmerged duplicate PRs](https://github.com/jo-inc/camofox-browser/issues/5643).
+#2 is fixed in [PR #6447](https://github.com/jo-inc/camofox-browser/pull/6447) (unmerged). #3 is
+described (but not code-fixed) in [PR #6190](https://github.com/jo-inc/camofox-browser/pull/6190)'s
+troubleshooting docs — patched here directly, no existing PR to reference. #4 and #5 have no
+upstream issue/PR at all as of this writing. #6 is our own choice, not an upstream bug.
+
+### Reddit login
+
+Reddit requires an authenticated session — SearXNG can't provide one, and there's no working
+`reddit` engine (removed from SearXNG's config; see the git history if you want the story).
+Camofox's browser persists cookies per fixed `userId` (`hermes-reddit`, set via
+`browser.camofox.user_id` in `config.yaml`), bind-mounted to `/opt/camofox-data` on the host so
+the session survives redeploys.
+
+- Credentials: `reddit_username`/`reddit_password` in `terraform.tfvars` (dedicated throwaway
+  account recommended, not a personal one) — same gitignored-secrets pattern as every other
+  credential in this deploy.
+- Recovery script: `terraform/scripts/reddit-login.py`, runs automatically on a fresh Camofox
+  install, or manually via `python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py` if the
+  session ever gets invalidated. Requires the search proxy tunnel to be up (see above) — login
+  attempts from the datacenter IP get rejected regardless of credential correctness.
+- If Reddit's login form shows "Something went wrong logging in" even with the tunnel up, wait
+  a bit before retrying — it's Reddit's login-specific fraud scoring reacting to repeated
+  attempts in a short window, not a credentials problem. Hammering retries risks flagging the
+  account further.
+
 ## Data Persistence
 
 ```

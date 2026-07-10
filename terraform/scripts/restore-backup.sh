@@ -76,6 +76,9 @@ docker exec hermes sed -i \
   /opt/data/config.yaml
 docker exec hermes grep -q '^- browser$' /opt/data/config.yaml || \
   docker exec hermes sed -i '/^- hermes-cli$/a\- browser' /opt/data/config.yaml
+# Fixed Camofox identity so Barbero's browser_navigate reuses the persisted
+# Reddit login (see reddit-login.py) instead of a fresh random session.
+docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/config.yaml
 
 # Restart once more to pick up the corrected config
 cd /opt/hermes && docker compose restart gateway 2>/dev/null || true

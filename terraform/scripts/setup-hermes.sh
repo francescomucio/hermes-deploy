@@ -150,12 +150,9 @@ engines:
     proxies:
       all://:
         - socks5://127.0.0.1:1080
-  - name: reddit
-    engine: reddit
-    shortcut: re
-    proxies:
-      all://:
-        - socks5://127.0.0.1:1080
+  # No `reddit` engine: reddit.com/search.json hard-requires an authenticated
+  # session, which SearXNG's engine can't provide. Use browser_navigate with
+  # the persisted Camofox Reddit login instead (see researcher/SOUL.md).
   - name: duckduckgo
     engine: duckduckgo
     shortcut: ddg
@@ -176,6 +173,22 @@ docker restart searxng >/dev/null 2>&1 || true
 # reaches it over the shared host network at 127.0.0.1:9377. Bound to
 # loopback only, not published to the internet.
 CAMOFOX_IMAGE="camofox-browser:135.0.1-x86_64"
+mkdir -p /opt/camofox-data
+CAMOFOX_FRESH_INSTALL=false
+
+# If a container exists but isn't using the persistence volume or host
+# networking (e.g. from before these were added), recreate it — otherwise
+# logins/cookies are lost on every redeploy, or the proxy is unreachable.
+if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
+  NEEDS_RECREATE=false
+  docker inspect camofox-browser --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' | grep -qx /opt/camofox-data || NEEDS_RECREATE=true
+  [ "$(docker inspect camofox-browser --format '{{.HostConfig.NetworkMode}}')" = "host" ] || NEEDS_RECREATE=true
+  if [ "$NEEDS_RECREATE" = true ]; then
+    echo "Camofox container outdated (volume/networking), recreating..."
+    docker rm -f camofox-browser
+  fi
+fi
+
 if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
   echo "Camofox already installed, ensuring running..."
   docker start camofox-browser >/dev/null 2>&1 || true
@@ -186,22 +199,62 @@ else
   fi
   if [ ! -d /opt/camofox-browser ]; then
     git clone https://github.com/jo-inc/camofox-browser /opt/camofox-browser
-    # Two known upstream bugs (Linux/Docker only, os.platform()==='linux' code
-    # path — doesn't affect macOS, which is likely why they're still open):
-    # 1. missing `await` on VirtualDisplay.get() -> DISPLAY becomes the
-    #    literal string "[object Promise]", browser fails to launch at all.
-    #    https://github.com/jo-inc/camofox-browser/issues/5643 (many dupes, unmerged)
-    # 2. explicit viewport dims send an `isMobile` field this Camoufox
-    #    version's protocol schema rejects -> every tab creation 500s.
-    #    https://github.com/jo-inc/camofox-browser/pull/6447 (unmerged)
-    # Verified locally: Google search works after this patch, real results,
-    # no CAPTCHA.
-    sed -i 's/vdDisplay = localVirtualDisplay\.get();/vdDisplay = await localVirtualDisplay.get();/' /opt/camofox-browser/server.js
-    sed -i 's/viewport: { width: 1280, height: 720 }/viewport: null/g' /opt/camofox-browser/server.js
   fi
+  # Known upstream bugs (Linux/Docker only, os.platform()==='linux' code
+  # path — doesn't affect macOS, which is likely why they're still open).
+  # See README.md "Camofox Browser Automation" for the full table + upstream
+  # links. Re-applied every run (idempotent seds) in case /opt/camofox-browser
+  # already existed from before these were added.
+  # 1. missing `await` on VirtualDisplay.get() -> DISPLAY becomes the
+  #    literal string "[object Promise]", browser fails to launch at all.
+  sed -i 's/vdDisplay = localVirtualDisplay\.get();/vdDisplay = await localVirtualDisplay.get();/' /opt/camofox-browser/server.js
+  # 2 & 3. explicit/default viewport dims send an `isMobile` field this
+  #    Camoufox version's protocol schema rejects -> every tab creation
+  #    500s, and the health probe's bare newContext() hits the same thing
+  #    every ~3 min, force-restarting the whole browser.
+  sed -i 's/viewport: { width: 1280, height: 720 }/viewport: null/g' /opt/camofox-browser/server.js
+  sed -i 's/testContext = await browser\.newContext();/testContext = await browser.newContext({ viewport: null });/' /opt/camofox-browser/server.js
+  # 4. PROXY_HOST/PROXY_PORT hardcode an http:// scheme (lib/proxy.js) —
+  #    doesn't work with our SOCKS5 reverse tunnel (search_proxy_tunnel
+  #    output); Playwright supports socks5:// natively, the env-var wrapper
+  #    just never offered it.
+  sed -i 's|server: `http://${host}:${port}`|server: `socks5://${host}:${port}`|' /opt/camofox-browser/lib/proxy.js
+  # 5. GeoIP auto-detection (triggered whenever a proxy is set) verifies the
+  #    proxy's exit IP via 6 external lookup APIs — all unreachable through
+  #    our tunnel, so it blocked browser launch entirely. Disabling it only
+  #    loses automatic locale/timezone/geo fingerprint matching, not the
+  #    actual proxying.
+  sed -i 's/geoip: !!launchProxy/geoip: false/g' /opt/camofox-browser/server.js
+  # Bind loopback only for defense-in-depth (redundant with the Hetzner
+  # firewall only allowing port 22 in, but cheap insurance) — required once
+  # switched to --network host below, since the container no longer has its
+  # own network namespace to isolate it.
+  sed -i "s/const server = app.listen(PORT, async () => {/const server = app.listen(PORT, '127.0.0.1', async () => {/" /opt/camofox-browser/server.js
   (cd /opt/camofox-browser && make build)
+  # --network host (not -p 127.0.0.1:9377:9377): needed so 127.0.0.1 inside
+  # the container means the *host's* loopback, where the reverse SOCKS
+  # tunnel actually listens — otherwise PROXY_HOST=127.0.0.1 points at the
+  # container's own loopback and every proxied request gets connection
+  # refused. Matches gateway/searxng, which are host-networked for the same
+  # reason.
   docker run -d --restart unless-stopped --name camofox-browser \
-    -p 127.0.0.1:9377:9377 "$CAMOFOX_IMAGE"
+    --network host \
+    -v /opt/camofox-data:/root/.camofox \
+    -e PROXY_HOST=127.0.0.1 \
+    -e PROXY_PORT=1080 \
+    "$CAMOFOX_IMAGE"
+  CAMOFOX_FRESH_INSTALL=true
+fi
+
+# Log the fixed hermes-reddit Camofox identity into Reddit on fresh installs
+# (persistence volume means this only needs to happen once, going forward).
+# config.yaml's browser.camofox.user_id is set to the same fixed userId in
+# restore-backup.sh so Barbero's browser_navigate calls reuse this session.
+if [ "$CAMOFOX_FRESH_INSTALL" = true ] && [ -n "${REDDIT_USERNAME:-}" ]; then
+  echo "Logging Camofox into Reddit..."
+  sleep 3
+  python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py || \
+    echo "Reddit login failed — run reddit-login.py manually to retry"
 fi
 
 # Create no-reconcile script (prevents dual gateway in dashboard)

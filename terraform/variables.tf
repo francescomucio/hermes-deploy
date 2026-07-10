@@ -105,6 +105,20 @@ variable "r2_endpoint" {
   default     = "https://7cadc6a3832ed2aa72c806180287146f.eu.r2.cloudflarestorage.com"
 }
 
+variable "reddit_username" {
+  description = "Reddit account username for Camofox-based browser login (research/Barbero use)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "reddit_password" {
+  description = "Reddit account password for Camofox-based browser login (research/Barbero use)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "email_accounts" {
   description = "Email accounts for himalaya IMAP reading"
   type = list(object({
