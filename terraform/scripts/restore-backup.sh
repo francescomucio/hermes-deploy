@@ -173,23 +173,37 @@ for env_path in glob.glob('/root/.hermes/profiles/*/.env'):
         print(f'  Removed stale Discord bot credentials for profile: {profile}')
 "
 
-# Start gateway services: only profiles with tokens, stop the rest
-docker exec hermes /command/s6-svc -u /run/service/gateway-default 2>/dev/null || true
+# Start gateway services: only profiles with tokens, stop the rest.
+#
+# Uses `hermes gateway start/stop` (via HERMES_HOME pointed at the
+# profile), NOT raw `s6-svc -u/-d` — found live that s6-svc only changes
+# the CURRENT container's runtime state. On every container boot, an
+# earlier boot hook (container_boot.py, "reconcile_profile_gateways")
+# reads each profile's *persisted* profiles/<name>/gateway_state.json
+# and auto-restarts exactly the ones whose `desired_state` says
+# "running", regardless of whatever s6 runtime state existed before the
+# restart. A profile stopped only via s6-svc comes right back on the very
+# next restart (including the config-picking-up restart earlier in this
+# same script) — confirmed live twice tonight, the second time by reading
+# container_boot.py directly rather than guessing again from timestamps.
+# The `hermes gateway` CLI is what actually writes `desired_state`.
+docker exec hermes /opt/hermes/.venv/bin/hermes gateway start 2>/dev/null || true
 echo "$PROFILE_DISCORD_TOKENS" | python3 -c "
 import sys, json, os, subprocess
 
 tokens = json.loads(sys.stdin.read())
 profiles_with_tokens = {p for p, t in tokens.items() if t}
 
-result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/run/service/'], capture_output=True, text=True)
-all_gateways = [d.replace('gateway-', '') for d in result.stdout.split() if d.startswith('gateway-') and d != 'gateway-default' and '/log' not in d]
+result = subprocess.run(['docker', 'exec', 'hermes', 'ls', '/opt/data/profiles/'], capture_output=True, text=True)
+all_profiles = [p for p in result.stdout.split() if p]
 
-for profile in all_gateways:
+for profile in all_profiles:
+    home = f'/opt/data/profiles/{profile}'
     if profile in profiles_with_tokens:
-        os.system(f'docker exec hermes /command/s6-svc -u /run/service/gateway-{profile} 2>/dev/null || true')
+        os.system(f'docker exec -e HERMES_HOME={home} hermes /opt/hermes/.venv/bin/hermes gateway start 2>/dev/null || true')
         print(f'  Started gateway: {profile}')
     else:
-        os.system(f'docker exec hermes /command/s6-svc -d /run/service/gateway-{profile} 2>/dev/null || true')
+        os.system(f'docker exec -e HERMES_HOME={home} hermes /opt/hermes/.venv/bin/hermes gateway stop 2>/dev/null || true')
         print(f'  Stopped gateway (no token): {profile}')
 "
 
