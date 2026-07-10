@@ -50,16 +50,21 @@ yourself, and should never ask for them in chat.
 ## Beyond Reddit: what Camofox is and isn't good for
 
 `browser_navigate` isn't limited to Reddit — it's a real browser, so it can open any URL. But
-that's not a bypass for serious anti-bot detection, and Google specifically is a lost cause
-right now: this server's IP has an established history of automated Google queries (from
-today's testing), and Google blocks it whether Camofox uses a proxy or not. Don't retry Google
-via the browser tools hoping a different approach gets through — it won't, and it just adds more
-automated-traffic history against an IP that's already flagged, making the block last longer.
+that's not a bypass for serious anti-bot detection, and Google specifically is a lost cause: a
+real Camofox browser gets the exact same "unusual traffic" CAPTCHA wall Google shows SearXNG's
+scraped requests, proxy or no proxy. Don't retry Google via the browser tools hoping a different
+approach gets through — it won't.
 
 Camofox is genuinely useful for **less aggressively-protected targets**: most ordinary news
 sites, sites without heavy JS-based bot detection, or reading a specific article's full content
-when `web_extract` gets a paywall/soft-block. Reach for it there, not as a general Google
-workaround.
+when `web_extract` gets a paywall/soft-block.
+
+**Fallback for DuckDuckGo/Bing specifically:** if `web_search` reports one of these as
+CAPTCHA'd/blocked, that's SearXNG's *scraping pattern* getting caught, not the underlying site
+actually being unreachable — a real browser gets through fine. Fall back to `browser_navigate`
+to `https://duckduckgo.com/?q=<query>` or `https://www.bing.com/search?q=<query>`, then
+`browser_snapshot` to read results, before giving up on that engine. This doesn't apply to
+Google (blocked at the browser level too, see above).
 
 ## Search engine coverage
 
