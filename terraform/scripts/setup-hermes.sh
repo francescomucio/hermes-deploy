@@ -162,6 +162,28 @@ engines:
   - name: github
     engine: github
     shortcut: gh
+  # News category — separate engines from general search, so a general
+  # search block (google/duckduckgo/etc.) doesn't take these down too.
+  - name: duckduckgo news
+    engine: duckduckgo_extra
+    categories: [news]
+    ddg_category: news
+    shortcut: ddn
+  - name: wikinews
+    engine: mediawiki
+    shortcut: wn
+    categories: [news, wikimedia]
+    base_url: "https://{language}.wikinews.org/"
+    search_type: text
+  - name: mojeek news
+    shortcut: mjknews
+    engine: mojeek
+    categories: [news, web]
+    search_type: news
+    paging: false
+  - name: bing news
+    engine: bing_news
+    shortcut: bin
 SEARXEOF
 
 # Restart SearXNG to pick up the new settings (only this container, no
@@ -237,11 +259,21 @@ else
   # container's own loopback and every proxied request gets connection
   # refused. Matches gateway/searxng, which are host-networked for the same
   # reason.
+  # No PROXY_HOST/PROXY_PORT: tested both ways for Google (blocked either
+  # way — this server's IP built up enough automated-query history that the
+  # proxy makes no difference, and routing Google traffic through the home
+  # IP burns that IP's reputation for no benefit) and for Reddit (persisted
+  # session browses fine without it — the proxy only ever seemed to matter
+  # for a *fresh* login, and even that's confounded by attempt-spacing, not
+  # cleanly isolated to the proxy). Not worth the complexity as a default;
+  # revisit empirically if a future Reddit re-login genuinely needs it.
+  # MAX_OLD_SPACE_SIZE: the image's own default (128MB) OOM-crashed under
+  # normal use ("JavaScript heap out of memory", Node aborted) — plenty of
+  # RAM headroom on this box to give it much more.
   docker run -d --restart unless-stopped --name camofox-browser \
     --network host \
     -v /opt/camofox-data:/root/.camofox \
-    -e PROXY_HOST=127.0.0.1 \
-    -e PROXY_PORT=1080 \
+    -e MAX_OLD_SPACE_SIZE=1024 \
     "$CAMOFOX_IMAGE"
   CAMOFOX_FRESH_INSTALL=true
 fi

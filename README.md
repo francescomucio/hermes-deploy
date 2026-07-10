@@ -164,20 +164,21 @@ ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 # Then open http://localhost:9119
 ```
 
-### Routing search through your home IP
+### Search proxy tunnel (SOCKS5, opt-in)
 
-Google (and Reddit) sometimes block or captcha-gate the server's datacenter IP. Run this from
-your machine to open a reverse SOCKS proxy on the server, tunneled back through your own
-connection — no firewall changes or extra ports needed, since it reuses the server's existing
-sshd:
+Available infrastructure, not part of the default path for anything right now — see
+"Camofox Browser Automation" below for why. Opens a reverse SOCKS5 proxy on the server, tunneled
+back through your own machine's connection, using the server's existing sshd (no firewall
+changes, no extra ports):
 
 ```bash
 ssh -R 1080 root@$(terraform output -raw server_ip) -N
 ```
 
-Leave it running while you want proxied search. SearXNG's `google` and `reddit` engines are
-configured to use `socks5h://127.0.0.1:1080` when it's up; `duckduckgo`/`wikipedia`/`github`
-are unaffected and keep working even when the tunnel isn't running.
+SearXNG's `google` engine has a `proxies: socks5://127.0.0.1:1080` entry that uses this when
+it's up — kept for reference, but testing showed it doesn't actually fix Google's CAPTCHA
+(blocked with or without it; see below), so don't expect it to help. `duckduckgo`/`wikipedia`/
+`github`/news engines never use it and are unaffected either way.
 
 ## Choosing a Model
 
@@ -267,23 +268,30 @@ Replace the included profiles with your own. The `profiles/default/SOUL.md` is y
 [Camofox](https://github.com/jo-inc/camofox-browser) is a self-hosted anti-detection browser
 server (Firefox fork with C++-level fingerprint spoofing) that gives Hermes' `browser_navigate`
 tools a real, stateful browser — used specifically for sites SearXNG's plain-HTTP engines can't
-handle: Google (CAPTCHA-gated, works via a real browser session) and Reddit (requires an
-authenticated login, not just IP reputation).
+handle: Reddit (requires an authenticated login, not just IP reputation) and, in principle,
+JS-heavy/CAPTCHA-gated sites generally. **Not a reliable Google workaround** — see below.
 
 Runs as its own container (`camofox-browser`), **host-networked** (`--network host`, like
 `gateway`/`searxng`, not `docker-compose.override.yml`) — required so `127.0.0.1` inside the
-container means the *host's* loopback, where both the `hermes` container's API access
-(`127.0.0.1:9377`) and the search proxy tunnel (`127.0.0.1:1080`) actually live. Bound to
-loopback only at the application level (`app.listen(PORT, '127.0.0.1', ...)`, patch #6 below) for
-defense-in-depth, since host networking removes Docker's own per-container port isolation.
-Deployed by `terraform/scripts/setup-hermes.sh`.
+container means the *host's* loopback, where the `hermes` container's API access
+(`127.0.0.1:9377`) actually lives. Bound to loopback only at the application level
+(`app.listen(PORT, '127.0.0.1', ...)`, patch #6 below) for defense-in-depth, since host
+networking removes Docker's own per-container port isolation. Deployed by
+`terraform/scripts/setup-hermes.sh`.
 
-Camofox's own outbound traffic is routed through the **search proxy tunnel** (`PROXY_HOST`/
-`PROXY_PORT` env vars) — not optional. Reddit's login flow applies much stricter fraud scoring
-than general browsing; a login from the Hetzner datacenter IP gets silently rejected
-("Something went wrong logging in") even with correct credentials, confirmed by testing both
-ways. General Google/Reddit browsing is more lenient about IP but routed through the tunnel too
-for consistency.
+**No proxy by default** (`PROXY_HOST`/`PROXY_PORT` unset). This was tried both ways: the search
+proxy tunnel doesn't help Google (blocked either way, see below) and isn't needed for Reddit once
+the session is persisted (cookies browse fine without it — the proxy only seemed to matter for a
+*fresh* login, and even that's confounded by attempt-spacing rather than cleanly isolated to the
+proxy itself). Routing through it also has a real cost: it burns the *home* IP's reputation with
+whatever site is being accessed, for no confirmed benefit. Revisit empirically if a future Reddit
+re-login genuinely needs it — the SOCKS5 proxy support (patch #4 below) is still there, just
+unused by default.
+
+**Heap limit**: the image's own default Node startup command caps memory at `MAX_OLD_SPACE_SIZE=128`
+(128MB) — too little for real browser + Playwright usage; it OOM-crashed in practice
+(`FATAL ERROR: ... JavaScript heap out of memory`, `Aborted (core dumped)`), silently killing
+whatever tab/session was active. Raised to `1024` — the box has several GB of headroom to spare.
 
 ### Upstream patches
 
@@ -325,12 +333,28 @@ the session survives redeploys.
   credential in this deploy.
 - Recovery script: `terraform/scripts/reddit-login.py`, runs automatically on a fresh Camofox
   install, or manually via `python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py` if the
-  session ever gets invalidated. Requires the search proxy tunnel to be up (see above) — login
-  attempts from the datacenter IP get rejected regardless of credential correctness.
-- If Reddit's login form shows "Something went wrong logging in" even with the tunnel up, wait
-  a bit before retrying — it's Reddit's login-specific fraud scoring reacting to repeated
-  attempts in a short window, not a credentials problem. Hammering retries risks flagging the
-  account further.
+  session ever gets invalidated. Confirmed working from the plain datacenter IP (no proxy) once
+  attempts are spaced out — see below.
+- If Reddit's login form shows "Something went wrong logging in," that's Reddit's login-specific
+  fraud scoring reacting to repeated attempts in a short window, not a credentials/IP problem —
+  confirmed by testing the same account, same IP, spaced further apart, succeeding cleanly.
+  Hammering retries risks flagging the account further; wait between attempts instead.
+
+### Google — not solved, don't chase it further
+
+Google's CAPTCHA isn't a config problem the way Reddit's was. Tested exhaustively: SearXNG's
+`google` engine gets CAPTCHA'd with or without the search proxy; Camofox gets blocked with or
+without the proxy too — and each block names the exact IP that got flagged (home IP when
+proxied, Hetzner IP when not), confirming Google's detection reacted to the *volume* of
+automated queries sent from this deployment during development, not a fixable IP-reputation or
+config issue. More retries just add to that history and extend the block. `google` is left
+configured but shouldn't be relied on until it's had time to cool down on its own — there's
+nothing to fix here, just time and reduced query volume.
+
+**News category**: `duckduckgo news`, `wikinews`, `mojeek news`, `bing news` — separate engines
+from general search (`google`/`duckduckgo`/etc.), added so a block on the general category
+doesn't take news queries down with it. `duckduckgo`/`wikipedia`/`github` (general search) remain
+reliable fallbacks in the meantime too.
 
 ## Data Persistence
 

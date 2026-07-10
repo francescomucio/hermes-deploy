@@ -428,39 +428,138 @@ starts disabled until Reddit's own client-side JS validates the inputs) both fai
 The user manually logging into the *same* account from their own laptop, in Chrome, worked with
 no security prompt at all — ruling out "account locked" or "wrong password."
 
-Conclusion: Reddit's login flow applies stricter, separate fraud scoring than general page
-browsing — even though general Reddit browsing had worked fine over the *server's own*
-datacenter IP earlier in the session. Routing Camofox's *own* traffic through the same home-IP
-tunnel (the proxy work in part six, item 4) — not just SearXNG's — was the actual fix. Once
-Camofox itself was routing through the tunnel, the login succeeded on the very next attempt,
-returning a real authenticated homepage (inbox, create-post, user avatar menu, feed).
+Conclusion drawn *at the time*: Reddit's login flow applies stricter, separate fraud scoring
+than general page browsing, and routing Camofox's own traffic through the home-IP tunnel was
+the fix — the login succeeded on the very next attempt after enabling it, returning a real
+authenticated homepage (inbox, create-post, user avatar menu, feed).
 
-**Operational note kept in the docs**: don't hammer retries against a login form. Two failed
-attempts in quick succession is exactly the pattern that gets flagged further — the right move
-each time here was to *stop*, investigate, and only retry once something material had actually
-changed (in this case: the proxy routing), never just "try again and hope."
+**This conclusion didn't fully survive further testing** — see part eight.
 
 ---
 
-## 9. Where things ended up
+## 9. Part eight: the proxy gets re-examined, and mostly retired
+
+This is the part of the story that actually resolves the "why" more honestly than part seven
+does on its own — later testing complicated the tidy "proxy fixed the login" narrative.
+
+### Barbero's own field report surfaces a regression
+
+Once Camofox was routing through the home-IP proxy by default, the actual research agent
+(Barbero, the profile that uses this day to day) reported back: Reddit worked great — real
+search results, logged-in session. **Google, however, now failed** — CAPTCHA on every real
+query, homepage fine but search blocked. That was a genuine surprise: Camofox's Google access
+had worked cleanly earlier in the session, *before* the proxy existed at all.
+
+Reproducing it directly confirmed the regression, and Google's own block page was specific about
+why:
+```
+Our systems have detected unusual traffic from your computer network.
+IP address: 2001:9e8:196b:d000:...   ← the home IP, not the server's
+```
+Camofox's proxy setting is global and per-launch, not per-request or per-site — once it's on,
+*every* site Camofox visits goes through it, including Google. The tunnel that helped Reddit's
+login was actively hurting Google, which had worked fine unproxied.
+
+### Testing "does Reddit really need it" properly this time
+
+That raised the obvious question part seven glossed over: was the proxy really what fixed the
+Reddit login, or was it just correlated with more time passing / fewer attempts in a row (both
+recognized patterns for login-fraud systems to relax)? The Reddit session was, by this point,
+already authenticated and persisted (cookies on disk, part seven's design). So the real testable
+question wasn't "does login need the proxy" (repeating that test risks flagging the account
+further, discussed and deliberately avoided) — it was **"does browsing with an already-persisted
+session need the proxy."**
+
+Removed the proxy entirely, kept the persisted `hermes-reddit` cookies, retested:
+
+- Reddit search (r/programming, "python"): worked. Real results, no re-login needed, no proxy.
+- Google search (same query style that worked hours earlier): **now blocked too** — but this
+  time citing the **Hetzner IP**, not the home IP.
+
+That second result was the real finding. Google wasn't blocked because of *which* IP Camofox
+used — it was blocked on *both*, meaning the deciding factor was never IP choice at all. What
+changed between "worked cleanly" (early in the session) and "blocked on every IP tried" (late in
+the session) was the sheer volume of automated `google.com/search` requests sent from this
+deployment over many hours of iterative testing — direct API navigations, no organic browsing
+behavior, dozens of repeated queries. Google's abuse detection reacted to that pattern, not to
+either IP's static reputation.
+
+A broader sweep confirmed it wasn't Google-specific either: SearXNG's `duckduckgo`, `brave`, and
+`startpage` engines were all independently rate-limited or CAPTCHA'd by this point too — every
+general-purpose engine that had been queried repeatedly throughout the session, regardless of
+whether it ever had proxy config at all (most of them never did). Only engines that had *never*
+been queried that session — a curated set of `news`-category engines added at this point
+specifically because they were untouched — came back clean immediately (see part nine).
+
+### Net conclusion: retire the proxy as a default
+
+- **Google**: proxy makes no verifiable difference (blocked either way) — and using it actively
+  costs something, since it puts the home IP's own reputation at risk with Google for zero
+  benefit. Not worth it.
+- **Reddit browsing**: doesn't need the proxy once a session is persisted — cookies aren't
+  IP-pinned the way a fresh login submission is scrutinized.
+- **Reddit login**: genuinely unresolved. The one successful proxied login and the one
+  unproxied-but-more-time-passed comparison were never cleanly isolated from each other. Left as
+  an open question, deliberately not re-tested repeatedly to find out (see the "don't hammer
+  retries" lesson, which still applies) — if a future re-login fails without the proxy, that's
+  the moment to try it again, once, not a standing default to keep enabled just in case.
+
+Practical upshot: `PROXY_HOST`/`PROXY_PORT` removed from Camofox's default `docker run` (all six
+patches from part six stay in the image regardless — the SOCKS5 support in particular cost real
+effort and remains available, just unused by default). One instance, no proxy, both Reddit
+(persisted session) and general browsing work the same way. Simpler than the two-Camofox-
+instances design that was being considered as the fix for the regression, before this testing
+made it unnecessary.
+
+### A second, unrelated crash found along the way
+
+While this was being investigated, Camofox crashed independently — a genuine Node.js
+out-of-memory abort (`FATAL ERROR: ... JavaScript heap out of memory`, `Aborted (core dumped)`),
+confirmed in the container logs, not a flaky report. Root cause: the upstream image's own
+default startup command caps the V8 heap at 128MB
+(`node --max-old-space-size=${MAX_OLD_SPACE_SIZE:-128}`) — workable for light use, not enough
+for a real research session driving multiple tabs/pages. `--restart unless-stopped` silently
+brought the container back, masking the crash from anything not reading logs directly; the
+in-flight research task's tab was gone. Fixed by setting `MAX_OLD_SPACE_SIZE=1024` — the host had
+several GB of memory headroom to spare, so this was pure config, no patch needed.
+
+---
+
+## 10. Where things ended up
 
 - SearXNG stays the default for DuckDuckGo/Wikipedia/GitHub — fast, cheap, multi-engine
-  aggregation in one request, no CAPTCHA issues encountered
-- SearXNG's `google` engine is left in place but isn't trustworthy alone (still gets CAPTCHA'd
-  sometimes even proxied) — Camofox is the dependable path for Google now
-- SearXNG's `reddit` engine was removed entirely — a guaranteed, permanent dead end
-  (unauthenticated API, hard-blocked) that would only waste a query cycle before falling back
-- Camofox, self-hosted, host-networked, routed through the home-IP tunnel, with all six patches
-  baked into a rebuilt image — handles both Google and authenticated Reddit browsing
-- The home-IP tunnel (`ssh -R 1080 root@<server-ip> -N`) is a manual, opt-in step the user runs
-  from their own machine when proxied search/browsing is wanted — not always-on, since it depends
-  on their laptop being reachable
+  aggregation in one request
+- **A `news` category was added to SearXNG** (`duckduckgo news`, `wikinews`, `mojeek news`,
+  `bing news`) specifically because these engines had never been queried during the debugging
+  session and came back clean immediately, unlike every general-search engine — a practical
+  workaround for "we exhausted the obvious engines through our own testing volume," not a
+  permanent architecture choice
+- SearXNG's `google` engine is left configured but not trustworthy — needs time (and much lower
+  query volume) to recover, not a config fix
+- SearXNG's `reddit` engine was removed entirely — a permanent dead end regardless of IP or
+  volume (hard auth requirement)
+- Camofox: self-hosted, host-networked, **no proxy by default**, heap limit raised to 1GB,
+  all six upstream patches baked into the image. Handles authenticated Reddit browsing reliably;
+  Google access is technically possible but currently burned by this session's own testing
+  volume, same as SearXNG's path
+- The home-IP tunnel (`ssh -R 1080 root@<server-ip> -N`) still exists and still works (verified
+  repeatedly throughout the session) but isn't wired into anything's default path anymore — kept
+  as documented, available infrastructure in case a future, actually-isolated test shows it's
+  needed for something specific
+- Barbero's own profile instructions (`SOUL.md`) were updated to reflect all of this directly:
+  don't chase Google via any path right now, use the browser tools for genuinely
+  less-protected sites rather than as a Google workaround, prefer the news engines for
+  current-events queries so a general-search block doesn't take those down too
 
 **[ASK: anything from tonight's session that felt like the "real" turning point to you, worth
 leading the article with? From the outside, my read is that the SearXNG→Camofox pivot (part 3)
-and the Reddit login-fraud-detection discovery (part 7) were the two moments that most changed
+and the proxy-retirement finding (part 8 — where a tidy-looking fix turned out to be a
+correlation, not causation, once tested more rigorously) were the two moments that most changed
 the shape of the solution — but you lived it, you may have a different read on what the
-interesting beat is.]**
+interesting beat is. Part 8 in particular might be the more honest "moral of the story" for an
+article: a plausible fix (the proxy) looked confirmed after one success, and it took Barbero's
+own field report plus deliberately isolating the variable to find out it wasn't really doing
+what it seemed to.]**
 
 ## Collected open questions
 

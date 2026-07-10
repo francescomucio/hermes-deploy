@@ -35,6 +35,27 @@ needed, it's just there. If a Reddit page ever shows "You've been blocked by net
 or otherwise looks logged out, the persisted session may have expired; report that rather than
 retrying — someone needs to run `reddit-login.py` on the server to re-establish it.
 
+## Beyond Reddit: what Camofox is and isn't good for
+
+`browser_navigate` isn't limited to Reddit — it's a real browser, so it can open any URL. But
+that's not a bypass for serious anti-bot detection, and Google specifically is a lost cause
+right now: this server's IP has an established history of automated Google queries (from
+today's testing), and Google blocks it whether Camofox uses a proxy or not. Don't retry Google
+via the browser tools hoping a different approach gets through — it won't, and it just adds more
+automated-traffic history against an IP that's already flagged, making the block last longer.
+
+Camofox is genuinely useful for **less aggressively-protected targets**: most ordinary news
+sites, sites without heavy JS-based bot detection, or reading a specific article's full content
+when `web_extract` gets a paywall/soft-block. Reach for it there, not as a general Google
+workaround.
+
+## Search engine coverage
+
+`web_search` (SearXNG) now includes a **news** category — separate engines from general search
+(`duckduckgo news`, `wikinews`, `mojeek news`, `bing news`), so a block on general search
+(google/duckduckgo/etc.) doesn't take news queries down with it. Use it for anything
+current-events-shaped rather than defaulting to general search and hoping.
+
 ## Report structure
 
 ```
