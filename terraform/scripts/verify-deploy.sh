@@ -43,8 +43,9 @@ echo "--- Gateway assignment (per profile) ---"
 # profile is running (if one is, it's silently sharing a token it
 # shouldn't — exactly how Cannavacciuolo kept stealing Bruno Barbieri's
 # and then Claudiano's session tonight).
-gw_list=$(docker exec hermes /opt/hermes/.venv/bin/hermes gateway list 2>/dev/null)
-gw_issues=$(echo "$gw_list" | PROFILE_DISCORD_TOKENS="$PROFILE_DISCORD_TOKENS" python3 -c "
+gw_check() {
+  docker exec hermes /opt/hermes/.venv/bin/hermes gateway list 2>/dev/null | \
+    PROFILE_DISCORD_TOKENS="$PROFILE_DISCORD_TOKENS" python3 -c "
 import json, os, re, sys
 tokens = json.loads(os.environ['PROFILE_DISCORD_TOKENS'])
 profiles_with_tokens = {p for p, t in tokens.items() if t}
@@ -56,24 +57,46 @@ for line in lines:
         continue
     seen[m.group(2)] = (m.group(1) == '✓')
 
+issues = []
 if not seen.get('default'):
-    print('default gateway is not running')
+    issues.append('default gateway is not running')
 for profile in sorted(profiles_with_tokens):
     if not seen.get(profile):
-        print(f'{profile} has a Discord token but its gateway is not running')
+        issues.append(f'{profile} has a Discord token but its gateway is not running')
 for profile, running in sorted(seen.items()):
     if profile == 'default' or profile in profiles_with_tokens:
         continue
     if running:
-        print(f'{profile} is running but has no assigned token (likely sharing another profile\'s Discord session)')
-")
-if [ -z "$gw_issues" ]; then
-  pass "gateway assignment: $(echo "$gw_list" | tr '\n' ' ')"
+        issues.append(f'{profile} is running but has no assigned token (likely sharing another profile\'s Discord session)')
+
+for issue in issues:
+    print(issue)
+for name, running in sorted(seen.items()):
+    state = 'up' if running else 'down'
+    print(f'{name}={state}', end=' ', file=sys.stderr)
+"
+}
+
+# Gateway processes reconnect to Discord over a few seconds after any
+# container restart (the one moments ago as part of this same deploy
+# included) — checking immediately catches them mid-reconnect and reports
+# a false failure. Poll briefly instead of a single fixed sleep, so this
+# doesn't need to guess the right delay or waste time when already stable.
+for attempt in 1 2 3 4 5; do
+  gw_out=$(gw_check 2>/tmp/gw_summary)
+  if [ -z "$gw_out" ]; then
+    break
+  fi
+  sleep 3
+done
+if [ -z "$gw_out" ]; then
+  pass "gateway assignment: $(cat /tmp/gw_summary)"
 else
   while IFS= read -r issue; do
     fail "$issue"
-  done <<< "$gw_issues"
+  done <<< "$gw_out"
 fi
+rm -f /tmp/gw_summary
 
 echo "--- Discord connection ---"
 if docker exec hermes grep -q "Connected as" /opt/data/logs/gateway.log 2>/dev/null; then
