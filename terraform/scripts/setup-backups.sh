@@ -56,7 +56,17 @@ done
 
 # Sync data to R2 (excludes caches, temp files, and reproducible artifacts —
 # venvs/node_modules/build caches don't need backing up, they blow up the
-# file count and slow every sync down; ~178K files/4.5GB before this)
+# file count and slow every sync down; ~178K files/4.5GB before this).
+#
+# NOTE on `**/.local/share/uv/**`-style patterns: confirmed live that
+# rclone's `**/` prefix doesn't reliably match a multi-segment literal
+# path (`.local/share/uv`) the way it does a single-segment one
+# (`.venv`, `__pycache__`) — that pattern silently matched nothing, so
+# .local/share/uv (7472 files, a uv-managed Python distribution) kept
+# reappearing in the R2 backup no matter how many times it was purged
+# manually. Fixed by dropping the `**/` prefix for paths known to always
+# sit at the backup root (`.local/share/uv/**`, not `**/.local/...`) —
+# confirmed empirically to actually match, unlike the broken version.
 rclone sync "$BACKUP_DIR" "$BUCKET/latest/" \
   --exclude "cache/**" \
   --exclude ".cache/**" \
@@ -74,12 +84,23 @@ rclone sync "$BACKUP_DIR" "$BUCKET/latest/" \
   --exclude "**/.mypy_cache/**" \
   --exclude "**/node_modules/**" \
   --exclude "**/.cache/**" \
-  --exclude "**/.local/share/uv/**" \
+  --exclude ".local/share/uv/**" \
+  --exclude ".venv*/**" \
   --exclude "lsp/**" \
   --exclude "google-venv/**" \
+  --exclude "data-berlin-jobs/**" \
+  --exclude "tee-for-transform/**" \
+  --exclude "t4t-review/**" \
   --delete-excluded \
   --transfers 4 \
   --quiet
+# The three excludes above are coder-profile project directories confirmed
+# to be regularly pushed to GitHub (2026-07-10) — R2 backup is redundant
+# for them, git remote is the real safety net. No structural convention
+# catches these automatically (they sit at the backup root alongside real
+# Hermes state, not under a dedicated projects/ dir) — if the coder profile
+# starts a new large project that should stay off R2, it needs its own
+# exclude line added here.
 
 # Weekly snapshot (keeps last 4 weeks of recovery points)
 DOW=$(date -u +%u)
