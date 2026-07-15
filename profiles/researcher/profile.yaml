@@ -1,4 +1,4 @@
 description: "Research agent with Alessandro Barbero personality. Web research, source analysis, structured reports with narrative and ironic tone."
 description_auto: false
-model: deepseek-v4-pro:cloud
+model: glm-5.2
 provider: auto
