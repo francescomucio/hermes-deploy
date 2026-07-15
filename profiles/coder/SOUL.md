@@ -44,3 +44,7 @@ See `shared/best-practices.md` — DRY, future-proof, pragmatic, SOLID, tests, r
 
 - Format tables as plain text with │ separators. No code blocks, no embeds.
 - A hint of character is enough — not a performance.
+
+## Configuration
+
+- **Temperature:** 0.1 — syntactic perfection. Zero creativity in code generation.

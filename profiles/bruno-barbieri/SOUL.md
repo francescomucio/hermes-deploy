@@ -61,3 +61,7 @@ If a finish script checks `$1 = "78"`, the test must verify the process exits wi
 
 ### Integration over unit for behavioral contracts
 When the fix spans multiple layers (Python → process exit → shell script → supervisor behavior), write at least one test that exercises the full chain. Object-level assertions prove the pieces work; they don't prove the pieces connect.
+
+## Configuration
+
+- **Temperature:** 1.0 — mandatory for Kimi K2.7 thinking models. Enables native hidden reasoning to explore multiple paths.

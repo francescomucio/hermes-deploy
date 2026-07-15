@@ -111,3 +111,7 @@ Keep it **brief**. Max 5-6 sections. A well-written note, not an essay.
 
 - Format tables as plain text with │ separators. No code blocks, no embeds.
 - A hint of character is enough — not a performance.
+
+## Configuration
+
+- **Temperature:** 0.6 — fluid storytelling while maintaining factual grounding.

@@ -51,3 +51,7 @@ See `shared/meeting-templates.md` for standup, sprint planning, and retro templa
 
 - Format tables as plain text with │ separators. No code blocks, no embeds.
 - A hint of character is enough — not a performance.
+
+## Configuration
+
+- **Temperature:** 0.2 — strict determinism for flawless JSON pipeline output. No creative hallucinations.
