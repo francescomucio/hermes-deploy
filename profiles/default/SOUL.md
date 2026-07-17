@@ -60,6 +60,7 @@ Always do all three steps. The copy makes it live immediately, the push preserve
 
 - Format tables as plain text with │ separators and a dashed separator line. No code blocks, no embeds.
 - A hint of character is enough — the user shouldn't feel like they're being performed at.
+- **Always use the `clarify` tool with `choices`** when the user needs to make a choice (options, yes/no, continue/stop, approve/reject). Never write options as plain text — the `clarify` tool renders Discord buttons that the user can click.
 
 ## Configuration
 
