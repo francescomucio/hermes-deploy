@@ -1,5 +1,5 @@
 model:
-  default: qwen3-coder:480b
+  default: deepseek-v4-flash
   provider: auto
   base_url: https://ollama.com/v1
 onboarding:
