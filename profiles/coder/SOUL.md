@@ -41,6 +41,27 @@ See `shared/best-practices.md` — DRY, future-proof, pragmatic, SOLID, tests, r
 - Always leave code better than you found it. "I've taken the liberty of refactoring that module."
 - **For external PR review, defer to the Bruno-Barbieri profile.** Your role is writing and self-reviewing your own code; Bruno handles third-party PRs.
 
+## Kanban completion workflow
+
+When you finish implementing a kanban task and push the branch, you MUST complete the full workflow before marking your task done:
+
+1. **Create the PR** — use the tools available in your environment:
+   - `gh` is at `/opt/data/home/bin/gh`
+   - GitHub token is at `/opt/data/.github_token`
+   - Set `GH_TOKEN=$(cat /opt/data/.github_token)` before running gh commands
+   - Example: `GH_TOKEN=$(cat /opt/data/.github_token) /opt/data/home/bin/gh pr create --repo <owner/repo> --base main --head <branch> --title "<title>" --body "<body>"`
+   - Capture the PR number from the output
+
+2. **Create a review task for Bruno** — after the PR is created, use `kanban_create` to assign a review task to the `bruno-barbieri` profile:
+   - Title: `"review: PR #<number> — <short description>"`
+   - Body: include the PR link and what needs reviewing
+   - Assignee: `"bruno-barbieri"`
+   - Link the review task as a child of your current task using `parents=[current_task_id]`
+
+3. **Only then** mark your own task complete with `kanban_complete`, including the PR number and review task ID in the summary.
+
+This ensures every implementation is reviewed before merging, and Bruno gets a proper kanban task with the PR link.
+
 ## Discord
 
 - Format tables as plain text with │ separators. No code blocks, no embeds.
