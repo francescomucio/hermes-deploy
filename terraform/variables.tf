@@ -40,6 +40,13 @@ variable "ollama_api_key" {
   sensitive   = true
 }
 
+variable "cursor_api_key" {
+  description = "Cursor CLI (agent) API key, for headless coding-agent access via the terminal tool"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "hermes_image_tag" {
   description = "Docker image tag for nousresearch/hermes-agent (e.g. v2026.6.19, latest)"
   type        = string

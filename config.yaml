@@ -384,6 +384,13 @@ kanban:
   dispatch_interval_seconds: 60
   dispatch_stale_timeout_seconds: 14400
   failure_limit: 2
+  # Capped at 2 (vCPU count on the deploy box) after a provider outage on
+  # 2026-07-18 caused the dispatcher to respawn failed workers indefinitely
+  # for 5.75 hours, pegging CPU and blocking Discord's event loop. See
+  # upstream NousResearch/hermes-agent#41805 — the real fix (classifying
+  # connection/timeout failures as non-retryable, not just billing 429s)
+  # isn't merged yet, so this cap is the mitigation until it is.
+  max_in_progress: 2
   max_in_progress_per_profile: null
   orchestrator_profile: ''
   worker_log_backup_count: 1

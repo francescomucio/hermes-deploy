@@ -85,6 +85,7 @@ resource "local_file" "deploy_env" {
     USER_TIMEZONE=${var.user_timezone}
     OLLAMA_API_KEY=${var.ollama_api_key}
     OLLAMA_MODEL=${var.ollama_model}
+    CURSOR_API_KEY=${var.cursor_api_key}
     DISCORD_BOT_TOKEN=${var.discord_bot_token}
     DISCORD_ALLOWED_USERS=${var.discord_allowed_users}
     EMAIL_ADDRESS=${length(var.email_accounts) > 0 ? var.email_accounts[0].email : ""}

@@ -7,6 +7,7 @@ deploy_repo           = "git@github.com:your-user/hermes-deploy.git"
 hermes_image_tag      = "v2026.6.19"
 ollama_api_key        = "your-ollama-api-key"
 ollama_model          = "deepseek-v4-flash"
+cursor_api_key        = "your-cursor-service-account-api-key"
 discord_bot_token     = "your-discord-bot-token"
 discord_allowed_users = "your-discord-user-id"
 profile_discord_tokens = {
