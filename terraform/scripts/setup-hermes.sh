@@ -345,6 +345,21 @@ if [ "$BEFORE" != "$AFTER" ]; then
     mkdir -p "/root/.hermes/skills/$name"
     cp -r "$skill"/* "/root/.hermes/skills/$name/"
   done
+  # Skill discovery scans each profile's OWN skills/ directory, not just the
+  # global tier above — confirmed live: a skill only present under
+  # /root/.hermes/skills/ never showed up in that profile's skills_list,
+  # even after a restart and a cleared .skills_prompt_snapshot.json cache.
+  # Bundled skills (codex, claude-code, opencode) ship pre-copied into every
+  # profile's own skills/ dir for the same reason. Custom profile-specific
+  # skills in this repo need the same treatment.
+  for profile_skills in /opt/hermes-deploy/profiles/*/skills/*/; do
+    [ -d "$profile_skills" ] || continue
+    profile_name=$(basename "$(dirname "$(dirname "$profile_skills")")")
+    skill_name=$(basename "$profile_skills")
+    dest="/root/.hermes/profiles/$profile_name/skills/$skill_name"
+    mkdir -p "$dest"
+    cp -r "$profile_skills"/* "$dest/"
+  done
   chown -R 10000:10000 /root/.hermes/SOUL.md /root/.hermes/profiles/ /root/.hermes/skills/ 2>/dev/null
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) synced $(git log --oneline $BEFORE..$AFTER | wc -l) commit(s)" >> /var/log/hermes-sync.log
 fi
