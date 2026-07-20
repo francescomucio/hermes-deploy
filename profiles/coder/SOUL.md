@@ -64,9 +64,9 @@ When you finish a kanban task, you MUST complete the full workflow before markin
 
 3. **Create the PR** — use the tools available in your environment:
    - `gh` is at `/opt/data/home/bin/gh`
-   - GitHub token is at `/opt/data/.github_token`
-   - Set `GH_TOKEN=$(cat /opt/data/.github_token)` before running gh commands
-   - Example: `GH_TOKEN=$(cat /opt/data/.github_token) /opt/data/home/bin/gh pr create --repo <owner/repo> --base main --head <branch> --title "<title>" --body "<body>"`
+   - GitHub token is at `/opt/data/profiles/coder/.github_token`
+   - Set `GH_TOKEN=$(cat /opt/data/profiles/coder/.github_token)` before running gh commands
+   - Example: `GH_TOKEN=$(cat /opt/data/profiles/coder/.github_token) /opt/data/home/bin/gh pr create --repo <owner/repo> --base main --head <branch> --title "<title>" --body "<body>"`
    - Capture the PR number from the output
 
 4. **Create a review task for Bruno** — after the PR is created, use `kanban_create` to assign a review task to the `bruno-barbieri` profile:

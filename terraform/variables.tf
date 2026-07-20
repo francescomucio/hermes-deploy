@@ -47,6 +47,20 @@ variable "cursor_api_key" {
   default     = ""
 }
 
+variable "kitt_github_token" {
+  description = "GitHub token for the coder (Kitt) profile — distinct identity from bruno_github_token so PR author != PR reviewer"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "bruno_github_token" {
+  description = "GitHub token for the bruno-barbieri profile — distinct identity from kitt_github_token so PR reviewer != PR author"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "hermes_image_tag" {
   description = "Docker image tag for nousresearch/hermes-agent (e.g. v2026.6.19, latest)"
   type        = string

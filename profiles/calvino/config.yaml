@@ -3,4 +3,7 @@ model:
   provider: auto
   base_url: https://ollama.com/v1
 toolsets:
-  - kanban
+- kanban
+onboarding:
+  seen:
+    profile_build_offered: true

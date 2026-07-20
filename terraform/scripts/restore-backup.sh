@@ -202,6 +202,30 @@ for env_path in glob.glob('/root/.hermes/profiles/*/.env'):
         print(f'  Removed stale Discord bot credentials for profile: {profile}')
 "
 
+# Per-profile GitHub tokens for coder (Kitt) and bruno-barbieri (Bruno) —
+# deliberately distinct identities, not the shared /opt/data/.github_token,
+# so Bruno reviewing Kitt's PR isn't the same GitHub account approving its
+# own PR (branch protection rules can block or devalue that). Same
+# staleness trap as the Discord/Ollama .env above applies here too, so
+# this runs in this script, not setup-hermes.sh.
+python3 -c "
+import os
+tokens = {
+    'coder': os.environ.get('KITT_GITHUB_TOKEN', ''),
+    'bruno-barbieri': os.environ.get('BRUNO_GITHUB_TOKEN', ''),
+}
+for profile, token in tokens.items():
+    if not token:
+        continue
+    profile_dir = f'/root/.hermes/profiles/{profile}'
+    os.makedirs(profile_dir, exist_ok=True)
+    token_path = f'{profile_dir}/.github_token'
+    with open(token_path, 'w') as f:
+        f.write(token)
+    os.system(f'chown 10000:10000 {token_path} && chmod 600 {token_path}')
+    print(f'  Configured GitHub token for profile: {profile}')
+"
+
 # Start gateway services: only profiles with tokens, stop the rest.
 #
 # Uses `hermes gateway start/stop` (via HERMES_HOME pointed at the

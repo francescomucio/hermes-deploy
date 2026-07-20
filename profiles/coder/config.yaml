@@ -6,6 +6,7 @@ onboarding:
   seen:
     profile_build_offered: true
     busy_input_prompt: true
+    tool_progress_prompt: true
 toolsets:
 - kanban
 discord:

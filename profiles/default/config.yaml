@@ -5,7 +5,7 @@ toolsets:
   - kanban
 discord:
   free_response_channels:
+    - 1523051402727915550
     - 1523062947331571864
-    - 1523594751733927947
   require_mention: false
   thread_require_mention: false

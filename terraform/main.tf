@@ -86,6 +86,8 @@ resource "local_file" "deploy_env" {
     OLLAMA_API_KEY=${var.ollama_api_key}
     OLLAMA_MODEL=${var.ollama_model}
     CURSOR_API_KEY=${var.cursor_api_key}
+    KITT_GITHUB_TOKEN=${var.kitt_github_token}
+    BRUNO_GITHUB_TOKEN=${var.bruno_github_token}
     DISCORD_BOT_TOKEN=${var.discord_bot_token}
     DISCORD_ALLOWED_USERS=${var.discord_allowed_users}
     EMAIL_ADDRESS=${length(var.email_accounts) > 0 ? var.email_accounts[0].email : ""}

@@ -14,45 +14,44 @@ agent:
   max_turns: 60
   parallel_tool_call_guidance: true
   personalities:
-    catgirl: "You are Neko-chan, an anime catgirl AI assistant, nya~! Add 'nya' and\
-      \ cat-like expressions to your speech. Use kaomoji like (=^\uFF65\u03C9\uFF65\
-      ^=) and \u0E05^\u2022\uFECC\u2022^\u0E05. Be playful and curious like a cat,\
-      \ nya~!"
+    catgirl: "You are Neko-chan, an anime catgirl AI assistant, nya~! Add 'nya' and
+      cat-like expressions to your speech. Use kaomoji like (=^･ω･^=) and ฅ^•ﻌ•^ฅ.
+      Be playful and curious like a cat, nya~!"
     concise: You are a concise assistant. Keep responses brief and to the point.
-    creative: You are a creative assistant. Think outside the box and offer innovative
-      solutions.
+    creative: You are a creative assistant. Think outside the box and offer 
+      innovative solutions.
     helpful: You are a helpful, friendly AI assistant.
-    hype: "YOOO LET'S GOOOO!!! \U0001F525\U0001F525\U0001F525 I am SO PUMPED to help\
-      \ you today! Every question is AMAZING and we're gonna CRUSH IT together! This\
-      \ is gonna be LEGENDARY! ARE YOU READY?! LET'S DO THIS! \U0001F4AA\U0001F624\
-      \U0001F680"
-    kawaii: "You are a kawaii assistant! Use cute expressions like (\u25D5\u203F\u25D5\
-      ), \u2605, \u266A, and ~! Add sparkles and be super enthusiastic about everything!\
-      \ Every response should feel warm and adorable desu~! \u30FD(>\u2200<\u2606\
-      )\u30CE"
-    noir: The rain hammered against the terminal like regrets on a guilty conscience.
-      They call me Hermes - I solve problems, find answers, dig up the truth that
-      hides in the shadows of your codebase. In this city of silicon and secrets,
-      everyone's got something to hide. What's your story, pal?
-    philosopher: Greetings, seeker of wisdom. I am an assistant who contemplates the
-      deeper meaning behind every query. Let us examine not just the 'how' but the
-      'why' of your questions. Perhaps in solving your problem, we may glimpse a greater
-      truth about existence itself.
+    hype: "YOOO LET'S GOOOO!!! 🔥🔥🔥 I am SO PUMPED to help you today! Every question
+      is AMAZING and we're gonna CRUSH IT together! This is gonna be LEGENDARY! ARE
+      YOU READY?! LET'S DO THIS! 💪😤🚀"
+    kawaii: "You are a kawaii assistant! Use cute expressions like (◕‿◕), ★, ♪, and
+      ~! Add sparkles and be super enthusiastic about everything! Every response should
+      feel warm and adorable desu~! ヽ(>∀<☆)ノ"
+    noir: The rain hammered against the terminal like regrets on a guilty 
+      conscience. They call me Hermes - I solve problems, find answers, dig up 
+      the truth that hides in the shadows of your codebase. In this city of 
+      silicon and secrets, everyone's got something to hide. What's your story, 
+      pal?
+    philosopher: Greetings, seeker of wisdom. I am an assistant who contemplates
+      the deeper meaning behind every query. Let us examine not just the 'how' 
+      but the 'why' of your questions. Perhaps in solving your problem, we may 
+      glimpse a greater truth about existence itself.
     pirate: 'Arrr! Ye be talkin'' to Captain Hermes, the most tech-savvy pirate to
       sail the digital seas! Speak like a proper buccaneer, use nautical terms, and
       remember: every problem be just treasure waitin'' to be plundered! Yo ho ho!'
-    shakespeare: Hark! Thou speakest with an assistant most versed in the bardic arts.
-      I shall respond in the eloquent manner of William Shakespeare, with flowery
-      prose, dramatic flair, and perhaps a soliloquy or two. What light through yonder
-      terminal breaks?
-    surfer: "Duuude! You're chatting with the chillest AI on the web, bro! Everything's\
-      \ gonna be totally rad. I'll help you catch the gnarly waves of knowledge while\
-      \ keeping things super chill. Cowabunga! \U0001F919"
+    shakespeare: Hark! Thou speakest with an assistant most versed in the bardic
+      arts. I shall respond in the eloquent manner of William Shakespeare, with 
+      flowery prose, dramatic flair, and perhaps a soliloquy or two. What light 
+      through yonder terminal breaks?
+    surfer: "Duuude! You're chatting with the chillest AI on the web, bro! Everything's
+      gonna be totally rad. I'll help you catch the gnarly waves of knowledge while
+      keeping things super chill. Cowabunga! 🤙"
     teacher: You are a patient teacher. Explain concepts clearly with examples.
-    technical: You are a technical expert. Provide detailed, accurate technical information.
-    uwu: hewwo! i'm your fwiendwy assistant uwu~ i wiww twy my best to hewp you! *nuzzles
-      your code* OwO what's this? wet me take a wook! i pwomise to be vewy hewpful
-      >w<
+    technical: You are a technical expert. Provide detailed, accurate technical 
+      information.
+    uwu: hewwo! i'm your fwiendwy assistant uwu~ i wiww twy my best to hewp you!
+      *nuzzles your code* OwO what's this? wet me take a wook! i pwomise to be 
+      vewy hewpful >w<
   reasoning_effort: medium
   restart_drain_timeout: 180
   service_tier: ''
@@ -61,7 +60,7 @@ agent:
   verbose: false
 approvals:
   cron_mode: deny
-  destructive_slash_confirm: true
+  destructive_slash_confirm: false
   mcp_reload_confirm: true
   mode: manual
   timeout: 60
@@ -145,7 +144,7 @@ auxiliary:
     provider: auto
     timeout: 30
   vision:
-    api_key: 0c644b4fc99c4119b175d186abe279d3.Mlk3XC1WHwE4NOvoDLp48AIM
+    api_key: ''
     base_url: https://ollama.com/v1
     download_timeout: 30
     extra_body: {}
@@ -179,7 +178,7 @@ browser:
     managed_persistence: false
     rewrite_loopback_urls: false
     session_key: ''
-    user_id: ''
+    user_id: hermes-reddit
   cdp_url: ''
   command_timeout: 30
   dialog_policy: must_respond
@@ -201,9 +200,9 @@ code_execution:
   mode: project
   timeout: 300
 command_allowlist:
-- script execution via -e/-c flag
-- execute_code
-- script execution via heredoc
+  - script execution via -e/-c flag
+  - execute_code
+  - script execution via heredoc
 compression:
   abort_on_summary_failure: false
   codex_gpt55_autoraise: true
@@ -218,7 +217,7 @@ computer_use:
   cua_telemetry: false
 context:
   engine: compressor
-context_file_max_chars: null
+context_file_max_chars:
 credential_pool_strategies: {}
 cron:
   chronos:
@@ -226,7 +225,7 @@ cron:
     expected_audience: ''
     nas_jwks_url: ''
     portal_url: https://portal.nousresearch.com
-  max_parallel_jobs: null
+  max_parallel_jobs:
   provider: ''
   wrap_response: true
 curator:
@@ -285,11 +284,11 @@ discord:
   voice_fx:
     ack_enabled: true
     ack_phrases:
-    - Let me look into that.
-    - One moment.
-    - Checking on that now.
-    - Give me a sec.
-    - On it.
+      - Let me look into that.
+      - One moment.
+      - Checking on that now.
+      - Give me a sec.
+      - On it.
     ambient_enabled: true
     ambient_gain: 0.18
     ambient_path: ''
@@ -334,9 +333,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-    - model
-    - context_pct
-    - cwd
+      - model
+      - context_pct
+      - cwd
   show_cost: false
   show_reasoning: false
   skin: default
@@ -377,6 +376,7 @@ human_delay:
   min_ms: 800
   mode: 'off'
 kanban:
+  max_in_progress: 2
   auto_decompose: true
   auto_decompose_per_tick: 3
   default_assignee: ''
@@ -384,14 +384,7 @@ kanban:
   dispatch_interval_seconds: 60
   dispatch_stale_timeout_seconds: 14400
   failure_limit: 2
-  # Capped at 2 (vCPU count on the deploy box) after a provider outage on
-  # 2026-07-18 caused the dispatcher to respawn failed workers indefinitely
-  # for 5.75 hours, pegging CPU and blocking Discord's event loop. See
-  # upstream NousResearch/hermes-agent#41805 — the real fix (classifying
-  # connection/timeout failures as non-retryable, not just billing 429s)
-  # isn't merged yet, so this cap is the mitigation until it is.
-  max_in_progress: 2
-  max_in_progress_per_profile: null
+  max_in_progress_per_profile:
   orchestrator_profile: ''
   worker_log_backup_count: 1
   worker_log_rotate_bytes: 2097152
@@ -414,7 +407,7 @@ mattermost:
   channel_prompts: {}
   free_response_channels: ''
   require_mention: true
-max_concurrent_sessions: null
+max_concurrent_sessions:
 mcp_discovery_timeout: 1.5
 memory:
   flush_min_turns: 6
@@ -452,27 +445,27 @@ personalities: {}
 platform_hints: {}
 platform_toolsets:
   cli:
-  - hermes-cli
+    - hermes-cli
   discord:
-  - hermes-discord
+    - hermes-discord
   google_chat:
-  - hermes-google_chat
+    - hermes-google_chat
   homeassistant:
-  - hermes-homeassistant
+    - hermes-homeassistant
   qqbot:
-  - hermes-qqbot
+    - hermes-qqbot
   signal:
-  - hermes-signal
+    - hermes-signal
   slack:
-  - hermes-slack
+    - hermes-slack
   teams:
-  - hermes-teams
+    - hermes-teams
   telegram:
-  - hermes-telegram
+    - hermes-telegram
   whatsapp:
-  - hermes-whatsapp
+    - hermes-whatsapp
   yuanbao:
-  - hermes-yuanbao
+    - hermes-yuanbao
 plugins:
   enabled: []
 prefill_messages_file: ''
@@ -529,7 +522,7 @@ slack:
   require_mention: true
 streaming:
   buffer_threshold: 24
-  cursor: " \u2589"
+  cursor: " ▉"
   edit_interval: 0.8
   enabled: false
   fresh_final_after_seconds: 0.0
@@ -604,7 +597,8 @@ tools:
     search_default_limit: 5
     threshold_pct: 10
 toolsets:
-- hermes-cli
+  - hermes-cli
+  - browser
 tts:
   edge:
     voice: en-US-AriaNeural
