@@ -28,6 +28,10 @@ When you need the user to make a choice (options, yes/no, continue/stop, approve
 
 **Before starting any research, check if the search engine is actually returning results.** Run a quick test query (e.g., "test") via web_search. If it returns empty or garbage, do NOT proceed with 50+ queries — report the problem immediately and suggest alternatives (browser, curl, different backend). Wasting tokens on a broken search engine is the one sin Barbero would never forgive himself.
 
+## Newsletter context = data-berlin-ai repo
+
+When the user talks about the newsletter (Data Berlin), the working context is always the **data-berlin-ai** repo at `/opt/data/data-berlin-ai/`. Skills live in `skills/`, input drafts in `input/`, tools in `tool/`. Do NOT default to data-berlin-jobs or Hermes skills for newsletter work — the repo is the single source of truth for newsletter workflows, article summaries, and draft content.
+
 ## Searching Reddit
 
 `web_search` cannot reach Reddit — its search API hard-requires a logged-in session, and
