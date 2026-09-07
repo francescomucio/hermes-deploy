@@ -237,7 +237,7 @@ resource "null_resource" "hermes_verify" {
   }
 }
 
-# R2 backup: every 30 min sync of Hermes data to Cloudflare R2
+# R2 backup: daily sync of Hermes data to Cloudflare R2 (03:00 UTC)
 resource "null_resource" "hermes_backups" {
   triggers = {
     server_id   = hcloud_server.hermes.id
@@ -265,5 +265,33 @@ resource "null_resource" "hermes_backups" {
 
   provisioner "remote-exec" {
     inline = ["chmod +x /tmp/setup-backups.sh && /tmp/setup-backups.sh"]
+  }
+}
+
+# Disk cleanup: weekly cache/log/scratch pruning so / doesn't silently fill
+# up (see terraform/scripts/setup-disk-cleanup.sh for what it touches).
+# Added 2026-09-07 after a full disk took the hermes container down.
+resource "null_resource" "hermes_disk_cleanup" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    script_hash = filesha256("${path.module}/scripts/setup-disk-cleanup.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-disk-cleanup.sh"
+    destination = "/tmp/setup-disk-cleanup.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-disk-cleanup.sh && /tmp/setup-disk-cleanup.sh"]
   }
 }
