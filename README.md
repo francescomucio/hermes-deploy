@@ -293,6 +293,14 @@ unused by default.
 (`FATAL ERROR: ... JavaScript heap out of memory`, `Aborted (core dumped)`), silently killing
 whatever tab/session was active. Raised to `1024` — the box has several GB of headroom to spare.
 
+**Cookie import (optional)**: Camofox exposes `POST /sessions/:userId/cookies` to inject cookies
+into a session directly — handy for bootstrapping a login (e.g. sign in once by hand, export
+cookies, import them) without fighting a site's bot/CAPTCHA defenses through automation. Disabled
+(403) unless `CAMOFOX_API_KEY` is set on the container, auth'd via `Authorization: Bearer
+<key>`. Set `camofox_api_key` in `terraform.tfvars` (generate with `openssl rand -hex 32`) to
+enable it — `setup-hermes.sh` passes it through and recreates the container on any change to it.
+Left unset by default; everything else (navigation, persisted Reddit login, etc.) works without it.
+
 ### Upstream patches
 
 The pinned version (`135.0.1-beta.24`, the Makefile default) has real, currently-unfixed bugs on

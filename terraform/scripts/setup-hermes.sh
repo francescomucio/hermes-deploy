@@ -211,8 +211,12 @@ if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
   NEEDS_RECREATE=false
   docker inspect camofox-browser --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' | grep -qx /opt/camofox-data || NEEDS_RECREATE=true
   [ "$(docker inspect camofox-browser --format '{{.HostConfig.NetworkMode}}')" = "host" ] || NEEDS_RECREATE=true
+  # Env vars only take effect on container creation — pick up a
+  # newly-set/rotated/cleared CAMOFOX_API_KEY (cookie-import auth) too.
+  CURRENT_CAMOFOX_KEY=$(docker inspect camofox-browser --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^CAMOFOX_API_KEY=//p')
+  [ "$CURRENT_CAMOFOX_KEY" = "${CAMOFOX_API_KEY:-}" ] || NEEDS_RECREATE=true
   if [ "$NEEDS_RECREATE" = true ]; then
-    echo "Camofox container outdated (volume/networking), recreating..."
+    echo "Camofox container outdated (volume/networking/API key), recreating..."
     docker rm -f camofox-browser
   fi
 fi
@@ -280,6 +284,7 @@ else
     --network host \
     -v /opt/camofox-data:/root/.camofox \
     -e MAX_OLD_SPACE_SIZE=1024 \
+    -e CAMOFOX_API_KEY="${CAMOFOX_API_KEY:-}" \
     "$CAMOFOX_IMAGE"
   CAMOFOX_FRESH_INSTALL=true
 fi

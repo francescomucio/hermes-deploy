@@ -40,6 +40,12 @@ reddit_password = "your-reddit-password"
 blind_username = "your-blind-account-email"
 blind_password = "your-blind-password"
 
+# Optional. Unlocks Camofox's cookie-import endpoint (POST
+# /sessions/:userId/cookies); left empty, that endpoint 403s and Camofox
+# still works fine for everything else (navigation, persisted login
+# sessions, etc). Generate with: openssl rand -hex 32
+camofox_api_key = "your-camofox-api-key"
+
 # force_restore defaults to false — deliberately not set here. Routine
 # `terraform apply` (config/token/script changes) skips the multi-minute R2
 # restore, since it's only needed on a genuinely fresh server. To force one

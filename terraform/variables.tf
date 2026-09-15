@@ -154,6 +154,13 @@ variable "blind_password" {
   default     = ""
 }
 
+variable "camofox_api_key" {
+  description = "Bearer token that unlocks Camofox's POST /sessions/:userId/cookies cookie-import endpoint (disabled/403 when unset). Optional — generate with `openssl rand -hex 32`."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "force_restore" {
   description = <<-EOT
     Force restore-backup.sh to pull the full R2 backup even on an already-
