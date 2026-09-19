@@ -1,5 +1,5 @@
 model:
-  default: deepseek-v4-flash
+  default: glm-5.3-flash
   provider: auto
   base_url: https://ollama.com/v1
 onboarding:

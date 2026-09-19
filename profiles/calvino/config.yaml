@@ -1,5 +1,5 @@
 model:
-  default: glm-5.2
+  default: glm-5.3
   provider: auto
   base_url: https://ollama.com/v1
 toolsets:
