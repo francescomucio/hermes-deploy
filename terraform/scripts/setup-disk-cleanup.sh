@@ -69,6 +69,35 @@ for e in /root/.hermes/tmp/*; do
   fi
 done
 
+# The hermes container's own /tmp (its writable layer, not a bind mount —
+# invisible from /root/.hermes). Bots use it as a scratchpad: scraped pages,
+# repo clones for PR review, throwaway venvs. Hit 2.7G by 2026-09-23 (a
+# 1.6G data-berlin-jobs clone, two PR checkouts, three identical PDF
+# venvs). Shorter threshold than above: /tmp is scratch by definition and
+# is wiped on every container recreate anyway. Judged by each entry's
+# newest file, so anything a bot is still writing into is kept.
+TMP_STALE_DAYS=7
+docker exec hermes sh -c '
+  cutoff=$(( $(date +%s) - '"$TMP_STALE_DAYS"'*86400 ))
+  for e in /tmp/* /tmp/.[!.]*; do
+    [ -e "$e" ] || continue
+    last=$(find "$e" -xdev -printf "%T@\n" 2>/dev/null | sort -rn | head -1)
+    last=${last%%.*}
+    if [ -n "$last" ] && [ "$last" -lt "$cutoff" ]; then
+      echo "removing stale container tmp entry: $e"
+      rm -rf "$e"
+    fi
+  done
+' || echo "container /tmp cleanup skipped (hermes container not running?)"
+
+# A bot once created a 4G swapfile in its own data dir (2026-07-18) — it
+# can't be activated from inside a container, so it was pure dead weight.
+# Real swap is /swapfile on the host (setup-hermes.sh).
+if [ -f /root/.hermes/swapfile ] && ! swapon --show=NAME --noheadings | grep -qx /root/.hermes/swapfile; then
+  echo "removing unusable /root/.hermes/swapfile"
+  rm -f /root/.hermes/swapfile
+fi
+
 # Opportunistic git gc: repack any repo whose loose objects exceed 50MB.
 # `git gc` never drops reachable history, so this is safe even on repos
 # with uncommitted local changes.
