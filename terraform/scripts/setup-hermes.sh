@@ -8,6 +8,20 @@ set +a
 
 echo "=== Hermes Setup ==="
 
+# Swap: the cx23 has 3.8GB RAM and the four gateways alone idle at ~1.7GB.
+# Without swap, any single ~1GB spike (Camoufox, a bot's git/node/pyright
+# process) hit the global OOM killer — 30 kills in 30 days, taking out
+# whatever was biggest, Hermes included. Swap turns those into slowdowns.
+if ! swapon --show=NAME --noheadings | grep -qx /swapfile; then
+  echo "Creating 2GB swapfile..."
+  [ -f /swapfile ] || { fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile; }
+  swapon /swapfile
+fi
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+# Low swappiness: only swap under real memory pressure, keep hot pages in RAM.
+echo 'vm.swappiness=10' > /etc/sysctl.d/99-hermes-swap.conf
+sysctl -q -p /etc/sysctl.d/99-hermes-swap.conf
+
 # Clone Hermes agent repo (needed for docker-compose.yml)
 if [ ! -d /opt/hermes ]; then
   echo "Cloning hermes-agent..."
@@ -200,24 +214,67 @@ docker restart searxng >/dev/null 2>&1 || true
 # tools). Own standalone container, independent of docker-compose — gateway
 # reaches it over the shared host network at 127.0.0.1:9377. Bound to
 # loopback only, not published to the internet.
-CAMOFOX_IMAGE="camofox-browser:135.0.1-x86_64"
+#
+# Pinned to an upstream release tag. To upgrade, bump CAMOFOX_REF and
+# CAMOUFOX_VERSION/CAMOUFOX_RELEASE together (the latter from the Dockerfile's
+# ARG defaults at that tag) — see README "Camofox Browser Automation".
+CAMOFOX_REF="v1.17.0"
+CAMOUFOX_VERSION="152.0.4"
+CAMOUFOX_RELEASE="beta.28"
+CAMOFOX_IMAGE="camofox-browser:${CAMOFOX_REF}-${CAMOUFOX_VERSION}-x86_64"
+# Bump when the `docker run` flags/env below change, so existing containers
+# get recreated to pick them up (flags only take effect at creation).
+CAMOFOX_RUN_REV="2"
 mkdir -p /opt/camofox-data
 CAMOFOX_FRESH_INSTALL=false
 
-# If a container exists but isn't using the persistence volume or host
-# networking (e.g. from before these were added), recreate it — otherwise
-# logins/cookies are lost on every redeploy, or the proxy is unreachable.
+# Build first, so an outdated container keeps serving until its
+# replacement image is ready (and stays up if the build fails).
+if ! docker image inspect "$CAMOFOX_IMAGE" >/dev/null 2>&1; then
+  echo "Building Camofox $CAMOFOX_REF (Camoufox $CAMOUFOX_VERSION-$CAMOUFOX_RELEASE)..."
+  if ! command -v make &> /dev/null; then
+    apt-get update -qq && apt-get install -y -qq make
+  fi
+  if [ ! -d /opt/camofox-browser ]; then
+    git clone https://github.com/jo-inc/camofox-browser /opt/camofox-browser
+  fi
+  # -f: discards the sed patches older deploys applied in place (all fixed
+  # or made configurable upstream by v1.17.0, see README).
+  git -C /opt/camofox-browser fetch -q --tags origin
+  git -C /opt/camofox-browser checkout -q -f "$CAMOFOX_REF"
+  # Upstream bug (jo-inc/camofox-browser#11025, v1.17.0): the Dockerfile runs
+  # `npm ci` before copying postinstall.js, which package.json's postinstall
+  # hook needs — the build fails with "Cannot find module /app/postinstall.js".
+  # Copy it (and the one lib file it imports) in first; it then finds the
+  # pre-baked Camoufox and skips its download. Drop once #11025 is fixed.
+  grep -q '^COPY postinstall.js' /opt/camofox-browser/Dockerfile || \
+    sed -i '0,/^COPY scripts\/ \.\/scripts\/$/s//COPY scripts\/ .\/scripts\/\nCOPY postinstall.js .\/\nCOPY lib\/camoufox-download.js .\/lib\//' /opt/camofox-browser/Dockerfile
+  # VERSION/RELEASE must be passed explicitly: the Makefile's own defaults
+  # (135.0.1-beta.24) are stale and, passed as --build-arg, override the
+  # Dockerfile's pinned Camoufox — silently pairing new server code with an
+  # old browser whose protocol schema it doesn't match.
+  (cd /opt/camofox-browser && make build VERSION="$CAMOUFOX_VERSION" RELEASE="$CAMOUFOX_RELEASE")
+  docker tag "camofox-browser:${CAMOUFOX_VERSION}-x86_64" "$CAMOFOX_IMAGE"
+  docker rmi "camofox-browser:${CAMOUFOX_VERSION}-x86_64" >/dev/null
+fi
+
+# Recreate the container whenever it's outdated: wrong volume/networking,
+# a different image (upgrade), different run flags, or a newly-set/rotated/
+# cleared CAMOFOX_API_KEY. The /opt/camofox-data volume (cookies, persisted
+# logins) survives the recreate.
 if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
   NEEDS_RECREATE=false
   docker inspect camofox-browser --format '{{range .Mounts}}{{.Source}}{{"\n"}}{{end}}' | grep -qx /opt/camofox-data || NEEDS_RECREATE=true
   [ "$(docker inspect camofox-browser --format '{{.HostConfig.NetworkMode}}')" = "host" ] || NEEDS_RECREATE=true
-  # Env vars only take effect on container creation — pick up a
-  # newly-set/rotated/cleared CAMOFOX_API_KEY (cookie-import auth) too.
+  [ "$(docker inspect camofox-browser --format '{{.Config.Image}}')" = "$CAMOFOX_IMAGE" ] || NEEDS_RECREATE=true
+  [ "$(docker inspect camofox-browser --format '{{index .Config.Labels "hermes.camofox.run-rev"}}')" = "$CAMOFOX_RUN_REV" ] || NEEDS_RECREATE=true
   CURRENT_CAMOFOX_KEY=$(docker inspect camofox-browser --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^CAMOFOX_API_KEY=//p')
   [ "$CURRENT_CAMOFOX_KEY" = "${CAMOFOX_API_KEY:-}" ] || NEEDS_RECREATE=true
   if [ "$NEEDS_RECREATE" = true ]; then
-    echo "Camofox container outdated (volume/networking/API key), recreating..."
+    echo "Camofox container outdated (volume/networking/image/flags/API key), recreating..."
     docker rm -f camofox-browser
+    # A recreate isn't a fresh install: persisted logins survive on the volume.
+    CAMOFOX_RECREATED=true
   fi
 fi
 
@@ -225,69 +282,43 @@ if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
   echo "Camofox already installed, ensuring running..."
   docker start camofox-browser >/dev/null 2>&1 || true
 else
-  echo "Installing Camofox browser server..."
-  if ! command -v make &> /dev/null; then
-    apt-get update -qq && apt-get install -y -qq make
-  fi
-  if [ ! -d /opt/camofox-browser ]; then
-    git clone https://github.com/jo-inc/camofox-browser /opt/camofox-browser
-  fi
-  # Known upstream bugs (Linux/Docker only, os.platform()==='linux' code
-  # path — doesn't affect macOS, which is likely why they're still open).
-  # See README.md "Camofox Browser Automation" for the full table + upstream
-  # links. Re-applied every run (idempotent seds) in case /opt/camofox-browser
-  # already existed from before these were added.
-  # 1. missing `await` on VirtualDisplay.get() -> DISPLAY becomes the
-  #    literal string "[object Promise]", browser fails to launch at all.
-  sed -i 's/vdDisplay = localVirtualDisplay\.get();/vdDisplay = await localVirtualDisplay.get();/' /opt/camofox-browser/server.js
-  # 2 & 3. explicit/default viewport dims send an `isMobile` field this
-  #    Camoufox version's protocol schema rejects -> every tab creation
-  #    500s, and the health probe's bare newContext() hits the same thing
-  #    every ~3 min, force-restarting the whole browser.
-  sed -i 's/viewport: { width: 1280, height: 720 }/viewport: null/g' /opt/camofox-browser/server.js
-  sed -i 's/testContext = await browser\.newContext();/testContext = await browser.newContext({ viewport: null });/' /opt/camofox-browser/server.js
-  # 4. PROXY_HOST/PROXY_PORT hardcode an http:// scheme (lib/proxy.js) —
-  #    doesn't work with our SOCKS5 reverse tunnel (search_proxy_tunnel
-  #    output); Playwright supports socks5:// natively, the env-var wrapper
-  #    just never offered it.
-  sed -i 's|server: `http://${host}:${port}`|server: `socks5://${host}:${port}`|' /opt/camofox-browser/lib/proxy.js
-  # 5. GeoIP auto-detection (triggered whenever a proxy is set) verifies the
-  #    proxy's exit IP via 6 external lookup APIs — all unreachable through
-  #    our tunnel, so it blocked browser launch entirely. Disabling it only
-  #    loses automatic locale/timezone/geo fingerprint matching, not the
-  #    actual proxying.
-  sed -i 's/geoip: !!launchProxy/geoip: false/g' /opt/camofox-browser/server.js
-  # Bind loopback only for defense-in-depth (redundant with the Hetzner
-  # firewall only allowing port 22 in, but cheap insurance) — required once
-  # switched to --network host below, since the container no longer has its
-  # own network namespace to isolate it.
-  sed -i "s/const server = app.listen(PORT, async () => {/const server = app.listen(PORT, '127.0.0.1', async () => {/" /opt/camofox-browser/server.js
-  (cd /opt/camofox-browser && make build)
   # --network host (not -p 127.0.0.1:9377:9377): needed so 127.0.0.1 inside
   # the container means the *host's* loopback, where the reverse SOCKS
-  # tunnel actually listens — otherwise PROXY_HOST=127.0.0.1 points at the
-  # container's own loopback and every proxied request gets connection
-  # refused. Matches gateway/searxng, which are host-networked for the same
-  # reason.
-  # No PROXY_HOST/PROXY_PORT: tested both ways for Google (blocked either
-  # way — this server's IP built up enough automated-query history that the
-  # proxy makes no difference, and routing Google traffic through the home
-  # IP burns that IP's reputation for no benefit) and for Reddit (persisted
-  # session browses fine without it — the proxy only ever seemed to matter
-  # for a *fresh* login, and even that's confounded by attempt-spacing, not
-  # cleanly isolated to the proxy). Not worth the complexity as a default;
-  # revisit empirically if a future Reddit re-login genuinely needs it.
-  # MAX_OLD_SPACE_SIZE: the image's own default (128MB) OOM-crashed under
-  # normal use ("JavaScript heap out of memory", Node aborted) — plenty of
-  # RAM headroom on this box to give it much more.
+  # tunnel actually listens (PROXY_HOST=127.0.0.1, PROXY_PROTOCOL=socks5
+  # when proxied — see README). Matches gateway/searxng.
+  # CAMOFOX_BIND_HOST: with host networking there's no per-container port
+  # isolation, so bind loopback explicitly (defense-in-depth on top of the
+  # Hetzner firewall only allowing port 22 in).
+  # No PROXY_HOST/PROXY_PORT by default: tested both ways, no confirmed
+  # benefit for Google or a persisted Reddit session, and it burns the home
+  # IP's reputation. See README.
+  # Memory: --memory caps the whole container so a runaway browser gets
+  # OOM-killed inside its own cgroup instead of triggering the host-wide
+  # OOM killer (which picks the biggest process — often Hermes itself).
+  # BROWSER_RSS_RESTART_THRESHOLD_MB makes Camofox restart the browser on
+  # its own before reaching that cap. MAX_OLD_SPACE_SIZE: the image default
+  # (128MB) OOM-crashed the Node server under real use.
+  # --shm-size: Docker's 64MB /dev/shm default is too small for Firefox
+  # content processes (upstream's own Makefile uses 2g).
+  # CAMOFOX_CRASH_REPORT_ENABLED=false: on by default upstream, it files
+  # *public* GitHub issues including session/tab context.
   docker run -d --restart unless-stopped --name camofox-browser \
     --network host \
+    --memory=1536m --memory-swap=2048m \
+    --shm-size=1g \
+    --label hermes.camofox.run-rev="$CAMOFOX_RUN_REV" \
     -v /opt/camofox-data:/root/.camofox \
-    -e MAX_OLD_SPACE_SIZE=1024 \
+    -e CAMOFOX_BIND_HOST=127.0.0.1 \
+    -e MAX_OLD_SPACE_SIZE=512 \
+    -e BROWSER_RSS_RESTART_THRESHOLD_MB=1000 \
+    -e CAMOFOX_CRASH_REPORT_ENABLED=false \
     -e CAMOFOX_API_KEY="${CAMOFOX_API_KEY:-}" \
     "$CAMOFOX_IMAGE"
-  CAMOFOX_FRESH_INSTALL=true
+  [ "${CAMOFOX_RECREATED:-false}" = true ] || CAMOFOX_FRESH_INSTALL=true
 fi
+
+# Drop superseded Camofox images (each is ~3.7GB on a 38GB disk).
+docker images --format '{{.Repository}}:{{.Tag}}' | grep '^camofox-browser:' | grep -vx "$CAMOFOX_IMAGE" | xargs -r docker rmi >/dev/null 2>&1 || true
 
 # Fresh Camofox installs need an initial Reddit login. The narrow
 # credentials file reddit-login.py reads doesn't exist yet at this point

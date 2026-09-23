@@ -275,7 +275,7 @@ Runs as its own container (`camofox-browser`), **host-networked** (`--network ho
 `gateway`/`searxng`, not `docker-compose.override.yml`) — required so `127.0.0.1` inside the
 container means the *host's* loopback, where the `hermes` container's API access
 (`127.0.0.1:9377`) actually lives. Bound to loopback only at the application level
-(`app.listen(PORT, '127.0.0.1', ...)`, patch #6 below) for defense-in-depth, since host
+(`CAMOFOX_BIND_HOST=127.0.0.1`) for defense-in-depth, since host
 networking removes Docker's own per-container port isolation. Deployed by
 `terraform/scripts/setup-hermes.sh`.
 
@@ -285,13 +285,19 @@ the session is persisted (cookies browse fine without it — the proxy only seem
 *fresh* login, and even that's confounded by attempt-spacing rather than cleanly isolated to the
 proxy itself). Routing through it also has a real cost: it burns the *home* IP's reputation with
 whatever site is being accessed, for no confirmed benefit. Revisit empirically if a future Reddit
-re-login genuinely needs it — the SOCKS5 proxy support (patch #4 below) is still there, just
+re-login genuinely needs it — SOCKS5 proxying (`PROXY_PROTOCOL=socks5`) is still there, just
 unused by default.
 
-**Heap limit**: the image's own default Node startup command caps memory at `MAX_OLD_SPACE_SIZE=128`
-(128MB) — too little for real browser + Playwright usage; it OOM-crashed in practice
-(`FATAL ERROR: ... JavaScript heap out of memory`, `Aborted (core dumped)`), silently killing
-whatever tab/session was active. Raised to `1024` — the box has several GB of headroom to spare.
+**Memory**: the container is capped at `--memory=1536m` so a runaway browser gets OOM-killed inside
+its own cgroup rather than triggering the host-wide OOM killer (which picks the biggest process —
+before the cap, that regularly meant Hermes itself). `BROWSER_RSS_RESTART_THRESHOLD_MB=1000` makes
+Camofox restart the browser on its own before reaching the cap, `MAX_OLD_SPACE_SIZE=512` raises the
+Node heap from the image's 128MB default (which OOM-crashed under real use), and `--shm-size=1g`
+replaces Docker's 64MB `/dev/shm`, too small for Firefox content processes. The host also has a 2GB
+swapfile (`setup-hermes.sh`) for the same reason: the cx23's 3.8GB is tight with four gateways.
+
+**Crash reporter off**: upstream enables it by default and it files *public* GitHub issues with
+session/tab context. Disabled via `CAMOFOX_CRASH_REPORT_ENABLED=false`.
 
 **Cookie import (optional)**: Camofox exposes `POST /sessions/:userId/cookies` to inject cookies
 into a session directly — handy for bootstrapping a login (e.g. sign in once by hand, export
@@ -301,32 +307,27 @@ cookies, import them) without fighting a site's bot/CAPTCHA defenses through aut
 enable it — `setup-hermes.sh` passes it through and recreates the container on any change to it.
 Left unset by default; everything else (navigation, persisted Reddit login, etc.) works without it.
 
-### Upstream patches
+### Version pinning and upgrades
 
-The pinned version (`135.0.1-beta.24`, the Makefile default) has real, currently-unfixed bugs on
-Linux/Docker specifically — the buggy code paths are gated behind `os.platform() === 'linux'`,
-so they likely don't show up in the maintainer's own (probably macOS-based) testing. All patches
-are applied automatically in `setup-hermes.sh`, idempotently, every time the container needs
-(re)creating — not just once at clone time, so they self-heal if `/opt/camofox-browser` already
-existed from before a patch was added. If `CAMOUFOX_VERSION`/`CAMOUFOX_RELEASE` in the Makefile
-ever get bumped, re-check whether these are still needed — an upstream fix landing would make the
-corresponding `sed` a silent no-op (fine) or, in the unlikely case upstream changes the
-surrounding code shape, a no-op that silently stops applying (re-verify manually).
+Pinned in `setup-hermes.sh` to a release tag (`CAMOFOX_REF`, currently `v1.17.0`) plus the
+Camoufox browser build it expects (`CAMOUFOX_VERSION`/`CAMOUFOX_RELEASE`, currently
+`152.0.4`/`beta.28`). To upgrade, bump all three together, taking the Camoufox pair from the
+`ARG` defaults in the upstream `Dockerfile` at that tag. The image is tagged with both, so the
+next run of the script builds it, recreates the container (the `/opt/camofox-data` volume and its
+logins survive) and removes the old image. Changing the `docker run` flags needs a
+`CAMOFOX_RUN_REV` bump to trigger a recreate.
 
-| # | File | Symptom | Root cause | Fix |
-|---|------|---------|------------|-----|
-| 1 | `server.js` | Every browser launch fails: `cannot open display: [object Promise]` | `VirtualDisplay.get()` is `async`, called without `await` — the Promise object gets stringified as the `DISPLAY` env var | Add `await` |
-| 2 | `server.js` (2 places) | Every tab creation fails with 500: `Browser.setDefaultViewport... property "<root>.viewport.isMobile" not described in this scheme` | Explicit `{ width: 1280, height: 720 }` viewport implicitly sends `isMobile: false`, which this Camoufox version's protocol schema rejects | `viewport: null` instead |
-| 3 | `server.js` (health probe) | Whole browser force-restarts every ~3 min, killing in-flight tabs/logins | Same root cause as #2, but in the periodic health-check's bare `newContext()` call (no explicit viewport arg at all — hits Camoufox's own default, which still carries `isMobile`) | `newContext({ viewport: null })` |
-| 4 | `lib/proxy.js` | `PROXY_HOST`/`PROXY_PORT` env vars silently don't work with a SOCKS5 proxy (e.g. the search proxy tunnel) | The proxy `server` string is hardcoded to `http://` scheme; Playwright supports `socks5://` natively but Camofox's env-var wrapper never exposed it | `socks5://` instead of `http://` |
-| 5 | `server.js` | Browser launch fails: `Failed to get a public proxy IP address from any API endpoint` whenever a proxy is set | GeoIP auto-detection (for locale/timezone/geo fingerprint matching) verifies the proxy's exit IP via 6 external lookup APIs — all unreachable through our tunnel, and Camofox treats that as fatal rather than falling back | `geoip: false` — loses automatic fingerprint geo-matching, keeps actual proxying |
-| 6 | `server.js` | N/A — defense-in-depth, not a bug | `app.listen(PORT, ...)` binds all interfaces by default; harmless under the old per-container networking but not once switched to `--network host` | Bind explicitly to `127.0.0.1` |
+Trap: the upstream `Makefile` still defaults to Camoufox `135.0.1-beta.24` and passes it as a
+`--build-arg`, overriding the `Dockerfile`'s pin. A plain `make build` pairs new server code with
+an old browser whose protocol schema it doesn't match — the root cause of the viewport `isMobile`
+errors we used to patch around. The script always passes `VERSION`/`RELEASE` explicitly.
 
-Upstream tracking: #1 has [many open, unmerged duplicate PRs](https://github.com/jo-inc/camofox-browser/issues/5643).
-#2 is fixed in [PR #6447](https://github.com/jo-inc/camofox-browser/pull/6447) (unmerged). #3 is
-described (but not code-fixed) in [PR #6190](https://github.com/jo-inc/camofox-browser/pull/6190)'s
-troubleshooting docs — patched here directly, no existing PR to reference. #4 and #5 have no
-upstream issue/PR at all as of this writing. #6 is our own choice, not an upstream bug.
+Until `v1.17.0` we ran a Camoufox 135 build of `v1.11.2` with six `sed` patches for
+Linux/Docker bugs. All are gone now, fixed or made configurable upstream: the `await` on
+`VirtualDisplay.get()` landed; the viewport/health-probe `isMobile` errors came from the version
+mismatch above; SOCKS5 proxying is `PROXY_PROTOCOL=socks5`; a failed GeoIP lookup now falls back to
+`geoip: false` by itself; and binding to loopback is `CAMOFOX_BIND_HOST=127.0.0.1`. See the git
+history for the old patch table.
 
 ### Reddit login
 
@@ -398,16 +399,21 @@ terraform output -raw search_proxy_tunnel   # then run the printed command
 ssh root@$(terraform output -raw server_ip)
 docker rm -f camofox-browser
 docker run -d --restart unless-stopped --name camofox-browser \
-  --network host \
+  --network host --memory=1536m --memory-swap=2048m --shm-size=1g \
   -v /opt/camofox-data:/root/.camofox \
-  -e MAX_OLD_SPACE_SIZE=1024 \
+  -e CAMOFOX_BIND_HOST=127.0.0.1 \
+  -e MAX_OLD_SPACE_SIZE=512 \
+  -e BROWSER_RSS_RESTART_THRESHOLD_MB=1000 \
+  -e CAMOFOX_CRASH_REPORT_ENABLED=false \
   -e PROXY_HOST=127.0.0.1 \
   -e PROXY_PORT=1080 \
+  -e PROXY_PROTOCOL=socks5 \
   camofox-browser:<tag>   # match the currently running image tag
 
-# 3. When done, revert to the unproxied default (same command, minus the
-#    two PROXY_* lines) so Reddit/general browsing don't silently break
-#    the next time the tunnel isn't running.
+# 3. When done, revert to the unproxied default so Reddit/general browsing
+#    don't silently break the next time the tunnel isn't running: re-run
+#    setup-hermes.sh (terraform apply), which recreates the container from
+#    its own flags since this one lacks the run-rev label.
 ```
 
 A persisted, logged-in Blind session (Camofox userId `hermes-reddit`, same fixed identity as

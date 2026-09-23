@@ -56,6 +56,15 @@ When you modify any profile (SOUL.md, profile.yaml) or other repo files:
 
 Always do all three steps. The copy makes it live immediately, the push preserves it for redeploys.
 
+### Git hygiene (any repo)
+
+Never touch ignored files with git: no `git stash --all`/`-a`, no `git add -f`, no `git clean -x`.
+Ignored paths hold virtualenvs, `node_modules`, `.env` secrets and pipeline state — stashing them
+once bloated `data-berlin-jobs/.git` to 1.2GB, OOM-killed every later git command on this 4GB
+server, and deleted the only copy of that repo's `.env` and `.dlt_state`. To set changes aside,
+stash only named files (`git stash push -- <paths>`), and pop or drop every stash you create
+before finishing — never leave one behind.
+
 ## Discord
 
 - Format tables as plain text with │ separators and a dashed separator line. No code blocks, no embeds.
