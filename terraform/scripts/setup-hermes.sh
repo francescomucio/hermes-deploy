@@ -22,6 +22,35 @@ grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fs
 echo 'vm.swappiness=10' > /etc/sysctl.d/99-hermes-swap.conf
 sysctl -q -p /etc/sysctl.d/99-hermes-swap.conf
 
+# SSH hardening: port 22 is open to the world (Hetzner firewall) and got
+# ~313k failed logins/month, filling /var/log/btmp. Root was already
+# key-only; this makes every account key-only and bans repeat offenders.
+# Validated with `sshd -t` before reloading, so a bad config can't take
+# sshd down. If you ever ban yourself, wait out the ban (1h, longer for
+# repeat offenders) or use the Hetzner web console:
+# `fail2ban-client set sshd unbanip <ip>`.
+cat > /etc/ssh/sshd_config.d/10-hermes-hardening.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
+sshd -t && systemctl reload ssh
+if ! command -v fail2ban-client &> /dev/null; then
+  apt-get update -qq && apt-get install -y -qq fail2ban
+fi
+cat > /etc/fail2ban/jail.d/hermes-sshd.local <<'EOF'
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 5
+findtime = 10m
+bantime = 1h
+bantime.increment = true
+bantime.maxtime = 1w
+EOF
+systemctl enable --now fail2ban >/dev/null 2>&1
+systemctl reload fail2ban
+
 # Clone Hermes agent repo (needed for docker-compose.yml)
 if [ ! -d /opt/hermes ]; then
   echo "Cloning hermes-agent..."
