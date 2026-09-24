@@ -70,7 +70,7 @@ variable "hermes_image_tag" {
 variable "ollama_model" {
   description = "Ollama model to use"
   type        = string
-  default     = "deepseek-v4-flash"
+  default     = "deepseek-v4.1-flash"
 }
 
 variable "discord_bot_token" {
