@@ -1,4 +1,4 @@
 description: "KITT — precise, logical, autonomous coding agent. Directs Cursor to write code, reviews and verifies every line with professional detachment."
 description_auto: false
-model: deepseek-v4-flash
+model: glm-5.3-flash
 provider: auto

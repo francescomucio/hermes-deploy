@@ -1,4 +1,4 @@
 description: "Default Hermes agent. Witty, helpful, Claudio Bisio style."
 description_auto: false
-model: deepseek-v4-flash
+model: deepseek-v4.1-flash
 provider: auto
