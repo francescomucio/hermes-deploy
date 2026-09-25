@@ -51,7 +51,7 @@ fi
 
 # Checkpoint SQLite WAL files so all data is in the main .db before sync
 find "$BACKUP_DIR" -name "*.db" -type f 2>/dev/null | while read -r db; do
-  sqlite3 "$db" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
+  sqlite3 "$db" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1 || true
 done
 
 # Sync data to R2 (excludes caches, temp files, and reproducible artifacts —
@@ -87,13 +87,20 @@ rclone sync "$BACKUP_DIR" "$BUCKET/latest/" \
   --exclude ".local/share/uv/**" \
   --exclude ".venv*/**" \
   --exclude "lsp/**" \
+  --exclude "cron/ticker_*" \
   --exclude "google-venv/**" \
   --exclude "data-berlin-jobs/**" \
   --exclude "tee-for-transform/**" \
   --exclude "t4t-review/**" \
   --delete-excluded \
   --transfers 4 \
+  --fast-list \
   --quiet
+# cron/ticker_* (Hermes v0.21+): scheduler heartbeat files rewritten every
+# few seconds — uploading one mid-write fails its MD5 check, and one failed
+# file makes rclone retry the WHOLE sync, doubling R2 Class A operations
+# (the billed kind). Useless to restore anyway.
+#
 # The three excludes above are coder-profile project directories confirmed
 # to be regularly pushed to GitHub (2026-07-10) — R2 backup is redundant
 # for them, git remote is the real safety net. No structural convention
@@ -107,7 +114,7 @@ DOW=$(date -u +%u)
 HOUR=$(date -u +%H)
 if [ "$DOW" = "7" ] && [ "$HOUR" = "03" ]; then
   WEEK=$(date -u +%Y-W%V)
-  rclone copy "$BUCKET/latest/" "$BUCKET/weekly/$WEEK/" --transfers 4 --quiet
+  rclone copy "$BUCKET/latest/" "$BUCKET/weekly/$WEEK/" --transfers 4 --fast-list --quiet
 
   # Prune snapshots older than 4 weeks
   rclone lsd "$BUCKET/weekly/" 2>/dev/null | awk '{print $NF}' | sort | head -n -4 | while read -r old; do
