@@ -62,9 +62,9 @@ variable "bruno_github_token" {
 }
 
 variable "hermes_image_tag" {
-  description = "Docker image tag for nousresearch/hermes-agent (e.g. v2026.6.19, latest)"
+  description = "Docker image tag for nousresearch/hermes-agent (e.g. v2026.9.14, latest)"
   type        = string
-  default     = "v2026.6.19"
+  default     = "v2026.9.14"
 }
 
 variable "ollama_model" {
