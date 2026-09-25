@@ -220,6 +220,8 @@ context:
 context_file_max_chars:
 credential_pool_strategies: {}
 cron:
+  model: deepseek-v4.1-flash
+  model_provider: auto
   chronos:
     callback_url: ''
     expected_audience: ''

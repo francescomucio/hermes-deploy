@@ -116,20 +116,32 @@ for pc in $(docker exec hermes sh -c 'ls /opt/data/profiles/*/config.yaml 2>/dev
   p_model=$(docker exec hermes sed -n '0,/^  default: /{s/^  default: //p}' "$pc")
   p_max_turns=$(docker exec hermes sed -n '0,/^  max_turns: /{s/^  max_turns: //p}' "$pc")
   p_auto_thread=$(docker exec hermes sed -n '0,/^  auto_thread: /{s/^  auto_thread: //p}' "$pc")
+  # Model is compared against the profile's config.yaml in the repo, not
+  # root: some profiles deliberately run a different model.
+  want_model=$(sed -n '0,/^  default: /{s/^  default: //p}' "/opt/hermes-deploy/profiles/$profile/config.yaml" 2>/dev/null || true)
+  want_model=${want_model:-$root_model}
   drift=""
-  [ -n "$p_model" ] && [ "$p_model" != "$root_model" ] && drift="${drift}model=$p_model(root=$root_model) "
+  [ -n "$p_model" ] && [ "$p_model" != "$want_model" ] && drift="${drift}model=$p_model(repo=$want_model) "
   [ -n "$p_max_turns" ] && [ "$p_max_turns" != "$root_max_turns" ] && drift="${drift}max_turns=$p_max_turns(root=$root_max_turns) "
   [ -n "$p_auto_thread" ] && [ "$p_auto_thread" != "$root_auto_thread" ] && drift="${drift}auto_thread=$p_auto_thread(root=$root_auto_thread) "
   if [ -n "$drift" ]; then
     fail "profile $profile has diverged from root: $drift"
   else
-    pass "profile $profile matches root (or has no override)"
+    pass "profile $profile matches (model=${p_model:-inherited})"
   fi
 
   if docker exec hermes grep -q "user_id: ''" "$pc" 2>/dev/null; then
     fail "profile $profile has an empty Camofox user_id (will get a fresh, unauthenticated session every task)"
   fi
 done
+
+cron_model=$(docker exec hermes sh -c "sed -n '/^cron:\$/,/^[a-z]/p' /opt/data/config.yaml" | sed -n 's/^  model: //p')
+cron_provider=$(docker exec hermes sh -c "sed -n '/^cron:\$/,/^[a-z]/p' /opt/data/config.yaml" | sed -n 's/^  model_provider: //p')
+if [ "$cron_model" = "$root_model" ] && [ -n "$cron_provider" ]; then
+  pass "cron fleet default: model=$cron_model provider=$cron_provider"
+else
+  fail "cron fleet default missing/stale (cron.model=${cron_model:-unset} root=$root_model, cron.model_provider=${cron_provider:-unset}) — unpinned cron jobs fall back to their creation snapshot ('openrouter') and fail"
+fi
 
 echo "--- Reddit session ---"
 reddit_out=$(python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py 2>&1)

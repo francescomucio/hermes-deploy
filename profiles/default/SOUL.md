@@ -56,6 +56,12 @@ When you modify any profile (SOUL.md, profile.yaml) or other repo files:
 
 Always do all three steps. The copy makes it live immediately, the push preserves it for redeploys.
 
+**Changing a model:** each profile's model lives in its `profiles/<name>/config.yaml` in the
+repo, the source of truth — every deploy resets the live profile configs to it, so edit the repo
+copy as well as the live one. When the *default* model changes, also update `cron.model` in
+`/opt/data/config.yaml` (and `config.yaml` in the repo): cron jobs follow `cron.model` /
+`cron.model_provider`, not `model.default`. Never pin models on individual cron jobs.
+
 ### Git hygiene (any repo)
 
 Never touch ignored files with git: no `git stash --all`/`-a`, no `git add -f`, no `git clean -x`.

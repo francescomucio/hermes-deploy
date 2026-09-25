@@ -112,12 +112,35 @@ docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" /opt/data/conf
 ROOT_MODEL=$(docker exec hermes sed -n '0,/^  default: /{s/^  default: //p}' /opt/data/config.yaml)
 ROOT_MAX_TURNS=$(docker exec hermes sed -n '0,/^  max_turns: /{s/^  max_turns: //p}' /opt/data/config.yaml)
 ROOT_AUTO_THREAD=$(docker exec hermes sed -n '0,/^  auto_thread: /{s/^  auto_thread: //p}' /opt/data/config.yaml)
+#
+# The model is the exception: some profiles deliberately run a different one
+# (Bruno kimi-k3, KITT glm-5.3-flash, Calvino glm-5.3). Copying the root model
+# over them silently flattened every bot onto the default's model on each
+# deploy (found 2026-09-25). Each profile's model comes from its config.yaml
+# in this repo — the source of truth — falling back to the root model only
+# for a profile the repo doesn't define one for.
 for pc in $(docker exec hermes sh -c 'ls /opt/data/profiles/*/config.yaml 2>/dev/null' || true); do
-  docker exec hermes sed -i "0,/^  default: /{s|^  default: .*|  default: $ROOT_MODEL|}" "$pc"
+  profile=$(basename "$(dirname "$pc")")
+  want_model=$(sed -n '0,/^  default: /{s/^  default: //p}' "/opt/hermes-deploy/profiles/$profile/config.yaml" 2>/dev/null || true)
+  docker exec hermes sed -i "0,/^  default: /{s|^  default: .*|  default: ${want_model:-$ROOT_MODEL}|}" "$pc"
   docker exec hermes sed -i "0,/^  max_turns: /{s|^  max_turns: .*|  max_turns: $ROOT_MAX_TURNS|}" "$pc"
   docker exec hermes sed -i "0,/^  auto_thread: /{s|^  auto_thread: .*|  auto_thread: $ROOT_AUTO_THREAD|}" "$pc"
   docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" "$pc"
 done
+
+# Cron fleet default (Hermes v0.21): every cron job remembers the provider
+# it was created with, and jobs created under v0.17 recorded our
+# `provider: auto` + ollama.com base_url as 'openrouter' — so after the
+# upgrade they looked for an OPENROUTER_API_KEY and failed with "No LLM
+# provider configured" (`hermes cron resnap` just re-records 'openrouter').
+# cron.model_provider/cron.model outrank that snapshot, so jobs stay unpinned
+# and follow one place. cron.model tracks the root model on every deploy;
+# when changing the default model live, change it here too.
+if docker exec hermes grep -q '^  model_provider:' /opt/data/config.yaml; then
+  docker exec hermes sed -i "/^cron:$/,/^[a-z]/{s|^  model: .*|  model: $ROOT_MODEL|}" /opt/data/config.yaml
+else
+  docker exec hermes sed -i "/^cron:$/a\\  model: $ROOT_MODEL\\n  model_provider: auto" /opt/data/config.yaml
+fi
 
 # Narrow, Reddit-only credentials file for reddit-login.py — deliberately
 # NOT /tmp/hermes-deploy.env, which also holds Discord tokens, R2 keys, the
