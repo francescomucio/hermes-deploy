@@ -146,8 +146,8 @@ echo "--- Backup freshness ---"
 # file lives inside /root/.hermes, which restore-backup.sh's rclone copy
 # overwrites from R2 on every deploy — right after a restore it reflects
 # whatever snapshot R2 had, not the true latest completion, causing a
-# false "stale" reading for up to 30 minutes after every deploy. The log
-# lives outside /root/.hermes and is never touched by the restore.
+# false "stale" reading for a while after every deploy. The log lives
+# outside /root/.hermes and is never touched by the restore.
 last_backup=$(grep "backup complete" /var/log/hermes-backup.log 2>/dev/null | tail -1 | awk '{print $1}')
 if [ -z "$last_backup" ]; then
   warn "no successful backup found in /var/log/hermes-backup.log yet (expected on a brand-new deploy)"
@@ -157,8 +157,8 @@ else
   age_min=$(( (now_epoch - last_epoch) / 60 ))
   if [ "$last_epoch" -eq 0 ]; then
     warn "couldn't parse backup timestamp: $last_backup"
-  elif [ "$age_min" -gt 40 ]; then
-    fail "last backup was ${age_min}m ago (expected every 30m)"
+  elif [ "$age_min" -gt 1560 ]; then
+    fail "last backup was ${age_min}m ago (expected daily, at 03:00 UTC)"
   else
     pass "last backup ${age_min}m ago"
   fi

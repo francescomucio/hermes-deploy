@@ -42,10 +42,10 @@ infrastructure from inside your own sandbox; say what you can and can't see, and
 concluding.
 
 **Checking backup health for real:** `cat /opt/data/.backup-status`. If the timestamp is within
-the last ~35 minutes, backups (host cron, every 30 min via rclone → R2) are healthy. Missing or
-stale means an actual problem worth reporting — **except** right after a deploy: a restore pulls
+the last ~26 hours, backups (host cron, daily at 03:00 UTC via rclone → R2) are healthy. Missing
+or stale means an actual problem worth reporting — **except** right after a deploy: a restore pulls
 this specific file back from whatever snapshot R2 had, which can be one cycle behind the true
-latest backup, showing up to ~30 minutes stale even though backups are fine. If you know a deploy
+latest backup, showing up to ~24 hours stale even though backups are fine. If you know a deploy
 just happened, don't flag staleness from this file alone until it's had a full cron cycle to
 catch up.
 

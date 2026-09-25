@@ -36,7 +36,7 @@ graph TB
     end
 
     GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4.1-flash, etc.)"]
-    DATA -.->|backup every 30 min| R2["Cloudflare R2<br/>(backup + restore)"]
+    DATA -.->|backup daily @ 03:00 UTC| R2["Cloudflare R2<br/>(backup + restore)"]
 ```
 
 ### How it works
@@ -49,7 +49,7 @@ Terraform manages three layers, each independently updatable:
 | **setup script** | Clone repos, pull image, configure, restore backup | On config changes (re-runs over SSH, no rebuild) |
 | **profiles script** | Deploy SOUL.md, himalaya config | On profile changes (re-runs over SSH, no rebuild) |
 
-Data lives on the server's local disk with **R2 backups every 30 minutes**. On redeploy, the latest backup is restored automatically (max 30 min data loss).
+Data lives on the server's local disk with **R2 backups daily at 03:00 UTC**. On redeploy, the latest backup is restored automatically (max 24h data loss).
 
 ## Profiles
 
@@ -435,7 +435,7 @@ clearly rather than failing confusingly if not.
 │  ├── profiles/                  │
 │  └── skills/                    │
 └────────────┬────────────────────┘
-             │ rclone sync every 30 min
+             │ rclone sync daily @ 03:00 UTC
              ▼
 ┌─────────────────────────────────┐
 │  Cloudflare R2 (free)           │
@@ -444,7 +444,7 @@ clearly rather than failing confusingly if not.
 ```
 
 - **Local disk**: all Hermes data lives here. Wiped on server rebuild.
-- **R2 backup**: every 30 minutes via rclone cron. On redeploy, the setup script restores the latest backup automatically. Max 30 minutes of data loss.
+- **R2 backup**: daily at 03:00 UTC via rclone cron. On redeploy, the setup script restores the latest backup automatically. Max 24 hours of data loss.
 - **Force backup before redeploy**: `ssh root@<ip> /usr/local/bin/hermes-backup`
 
 ## Project Structure

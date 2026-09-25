@@ -16,7 +16,7 @@ echo "=== Restoring from R2 backup ==="
 # already-provisioned server, the live filesystem IS the current state —
 # restoring FROM the backup INTO it on every routine apply (a token
 # swap, a config tweak, a script fix) doesn't accomplish anything except
-# cost several minutes, since cron backs up the live state every 30 min
+# cost several minutes, since cron backs up the live state daily
 # regardless. Skipped by default once a server looks provisioned;
 # force it back on for a genuine one-off (disaster recovery, suspected
 # local corruption) with `terraform apply -var="force_restore=true"` —

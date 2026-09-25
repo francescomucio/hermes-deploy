@@ -29,7 +29,7 @@ Check backup size on R2:
 rclone size r2:hermes-backups
 ```
 
-Backups run automatically every 30 minutes via cron.
+Backups run automatically once a day (03:00 UTC) via cron.
 
 ## Health Check
 
@@ -147,7 +147,7 @@ docker exec hermes hermes --version
 
 ## Important Notes
 
-- The server's local disk is **not persistent** — all data is backed up to R2 every 30 minutes.
+- The server's local disk is **not persistent** — all data is backed up to R2 once a day (03:00 UTC).
 - Always force a backup before any destructive operation.
 - `terraform apply` is NOT available on this server — infrastructure changes must be done from the local machine.
 - The gateway service is managed by s6 supervisor. After container restarts, it needs `s6-svc -u` to start.

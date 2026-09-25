@@ -128,8 +128,8 @@ chmod +x /usr/local/bin/hermes-backup
 echo "Running initial backup..."
 /usr/local/bin/hermes-backup || echo "Initial backup had errors (will retry on next cron run)"
 
-# Set up hourly cron
-CRON_LINE="*/30 * * * * /usr/local/bin/hermes-backup"
+# Set up daily cron
+CRON_LINE="0 3 * * * /usr/local/bin/hermes-backup"
 (crontab -l 2>/dev/null | grep -v hermes-backup; echo "$CRON_LINE") | crontab -
 
-echo "=== Backups configured (every 30 min to R2) ==="
+echo "=== Backups configured (daily at 03:00 UTC to R2) ==="
