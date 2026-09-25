@@ -35,7 +35,7 @@ graph TB
         GW --> Cron
     end
 
-    GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4-flash, etc.)"]
+    GW -->|Ollama Cloud API| LLM["LLM<br/>(deepseek-v4.1-flash, etc.)"]
     DATA -.->|backup every 30 min| R2["Cloudflare R2<br/>(backup + restore)"]
 ```
 
@@ -193,7 +193,7 @@ Hermes uses [Ollama Cloud](https://ollama.com) as the LLM provider. Set `ollama_
 | `deepseek-v4-pro` | Complex reasoning | Slower, more expensive, 1.6T |
 | `deepseek-v4-flash` | Retired | Superseded by `deepseek-v4.1-flash` |
 
-Start with `deepseek-v4-flash` — it handles agentic workflows (tool calls, pagination, multi-step tasks) well. Smaller models struggle with tool use and may ignore the SOUL.md personality.
+Start with `deepseek-v4.1-flash` — it handles agentic workflows (tool calls, pagination, multi-step tasks) well. Smaller models struggle with tool use and may ignore the SOUL.md personality.
 
 Check available models:
 ```bash
@@ -501,7 +501,7 @@ Should show exactly one `hermes gateway run` process.
 
 ### Bot doesn't use the SOUL.md personality
 
-- **Small models** (gemma3:4b) often ignore system prompts. Use `deepseek-v4-flash` or larger.
+- **Small models** (gemma3:4b) often ignore system prompts. Use `deepseek-v4.1-flash` or larger.
 - Check the file: `docker exec hermes cat /opt/data/SOUL.md`
 - SOUL.md is loaded per-message — no restart needed after editing.
 

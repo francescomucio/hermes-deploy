@@ -291,7 +291,7 @@ Work style: direct, fast, minimal chatter. "Vai", "Dai", "Fatto". Prefers determ
 Newsletter summaries: English only, 1 sentence max. Italian is meta-discussion only.
 
 Conversation started: Wednesday, July 15, 2026
-Model: deepseek-v4-flash
+Model: deepseek-v4.1-flash
 Provider: ollama-cloud
 
 ## Current Session Context

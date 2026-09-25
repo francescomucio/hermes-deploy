@@ -420,7 +420,7 @@ memory:
   write_approval: false
 model:
   base_url: https://ollama.com/v1
-  default: deepseek-v4-flash
+  default: deepseek-v4.1-flash
   provider: auto
 model_catalog:
   enabled: true
