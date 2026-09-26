@@ -11,7 +11,7 @@ agent:
   gateway_timeout: 1800
   gateway_timeout_warning: 900
   image_input_mode: auto
-  max_turns: 60
+  max_turns: 120
   parallel_tool_call_guidance: true
   personalities:
     catgirl: "You are Neko-chan, an anime catgirl AI assistant, nya~! Add 'nya' and
