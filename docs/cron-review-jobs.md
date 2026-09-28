@@ -9,7 +9,7 @@ September 2026: **a script decides, the model only writes.**
 - When there is work, the script puts **everything the review needs into the prompt** (texts or diffs, the
   previous review, one PR per run, oldest first, with a size cap). The model reads once and posts; no tool loops
   (each tool call re-sends the whole context). A full Calvino review went from ~350k tokens to ~150k.
-- One PR per run, and the jobs run **every 5 minutes**: the check is only the script (no model, zero tokens),
+- One PR per run, and the oroscopi jobs run **every 2 minutes** (tee-for-transform every 5): the check is only the script (no model, zero tokens),
   so a queue of PRs is worked through one every few minutes. A job can't re-trigger itself with `hermes cron run`
   while it's running ("Job is already being fired by the scheduler; not run again"), and inside the agent's
   terminal `hermes` isn't on the PATH anyway: tried on 28/09, dropped.
@@ -43,9 +43,9 @@ Scripts go in the profile's `scripts/` dir (Hermes only runs scripts from there)
 cp profiles/bruno-barbieri/scripts/*.py /root/.hermes/profiles/bruno-barbieri/scripts/
 chown 10000:10000 /root/.hermes/profiles/bruno-barbieri/scripts/*.py
 P=profiles/bruno-barbieri/cron-prompts
-docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/oroscopi-calvino-review.txt)" \
+docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 2m" "$(cat $P/oroscopi-calvino-review.txt)" \
   --name "oroscopi calvino review" --script oroscopi_gate_calvino.py --model glm-5.3-flash --deliver discord:1553439189402656799
-docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/oroscopi-bruno-review.txt)" \
+docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 2m" "$(cat $P/oroscopi-bruno-review.txt)" \
   --name "oroscopi bruno review" --script oroscopi_gate_bruno.py --deliver discord:1553439189402656799
 docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/tee-for-transform-review-watcher.txt)" \
   --name "tee-for-transform review watcher" --script check_review_requests.py --deliver origin
