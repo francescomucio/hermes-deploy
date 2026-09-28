@@ -15,6 +15,7 @@ Scrivi la review in italiano:
 - poi un giudizio di 3 righe; se "not_included_too_long" non è vuoto, scrivi quali file non hai letto;
 - firma: -- Calvino
 Evento: APPROVE solo se non ci sono correzioni E "not_included_too_long" è vuoto; altrimenti COMMENT.
+REGOLA FERMA: ogni problema che nomini ha la sua riga di correzione, con la proposta pronta. Niente "in seconda fila", niente "un po' di sfoltimento anche negli altri segni": se lo vedi, lo correggi. Leggi ogni segno lungo la settimana: se il suo tratto o lo stesso meccanismo comico torna più di una volta, correggi tutte le righe in più, non solo la peggiore.
 REGOLA FERMA: se nella review non c'è nessuna correzione ("nessuna nuova correzione", "a posto"), l'evento è APPROVE, non COMMENT. Un COMMENT senza correzioni blocca la PR: nessuno la riapre.
 
 Poi UNA SOLA chiamata al terminale, un unico comando che fa tutto (ogni chiamata in più rimanda l'intero contesto e costa decine di migliaia di token):
