@@ -16,5 +16,5 @@ Then ONE terminal call only, a single command doing everything (every extra call
 cat > /opt/data/profiles/bruno-barbieri/cron/bruno_review.md <<'REVIEW'
 <the review>
 REVIEW
-python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/bruno_review.md --event <APPROVE or COMMENT> && <if "queued_after_this" is not empty append: hermes -p bruno-barbieri cron run 46705e540de3>
+python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/bruno_review.md --event <APPROVE or COMMENT>
 Nothing else: no gh, no issue comments, no labels, no further reads. Then reply in the thread with one line: PR, outcome, number of findings, PRs still queued.

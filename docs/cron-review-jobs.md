@@ -9,8 +9,12 @@ September 2026: **a script decides, the model only writes.**
 - When there is work, the script puts **everything the review needs into the prompt** (texts or diffs, the
   previous review, one PR per run, oldest first, with a size cap). The model reads once and posts; no tool loops
   (each tool call re-sends the whole context). A full Calvino review went from ~350k tokens to ~150k.
-- One PR per run; if `queued_after_this` is not empty the prompt ends with `hermes cron run <id>`, so the next PR
-  starts at the next scheduler tick instead of 30 minutes later.
+- One PR per run, and the jobs run **every 5 minutes**: the check is only the script (no model, zero tokens),
+  so a queue of PRs is worked through one every few minutes. A job can't re-trigger itself with `hermes cron run`
+  while it's running ("Job is already being fired by the scheduler; not run again"), and inside the agent's
+  terminal `hermes` isn't on the PATH anyway: tried on 28/09, dropped.
+- Everything the model does after reading is **one terminal call** (write the review file, post it): each extra
+  tool call re-sends the whole context (~35k tokens a call).
 
 | Job | ID | Script | Model | Prompt |
 |---|---|---|---|---|
@@ -39,15 +43,14 @@ Scripts go in the profile's `scripts/` dir (Hermes only runs scripts from there)
 cp profiles/bruno-barbieri/scripts/*.py /root/.hermes/profiles/bruno-barbieri/scripts/
 chown 10000:10000 /root/.hermes/profiles/bruno-barbieri/scripts/*.py
 P=profiles/bruno-barbieri/cron-prompts
-docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 30m" "$(cat $P/oroscopi-calvino-review.txt)" \
+docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/oroscopi-calvino-review.txt)" \
   --name "oroscopi calvino review" --script oroscopi_gate_calvino.py --model glm-5.3-flash --deliver discord:1553439189402656799
-docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 30m" "$(cat $P/oroscopi-bruno-review.txt)" \
+docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/oroscopi-bruno-review.txt)" \
   --name "oroscopi bruno review" --script oroscopi_gate_bruno.py --deliver discord:1553439189402656799
-docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 30m" "$(cat $P/tee-for-transform-review-watcher.txt)" \
+docker exec -u hermes hermes hermes -p bruno-barbieri cron create "every 5m" "$(cat $P/tee-for-transform-review-watcher.txt)" \
   --name "tee-for-transform review watcher" --script check_review_requests.py --deliver origin
 ```
 
-New jobs get new IDs: update the `hermes cron run <id>` line at the end of each prompt (`cron edit <id> --prompt`).
 Check that a gate sleeps: `docker exec -u hermes hermes python3 /opt/data/profiles/bruno-barbieri/scripts/<gate>.py`
 must end with `{"wakeAgent": false}` when there is nothing to review. Token use per run is in
 `/root/.hermes/profiles/bruno-barbieri/cron/usage_audit.jsonl`.

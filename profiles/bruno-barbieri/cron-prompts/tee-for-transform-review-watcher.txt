@@ -14,5 +14,4 @@ Then these actions, nothing else:
 1. Write the review to /opt/data/profiles/bruno-barbieri/cron/review_pr<N>.md
 2. python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --pr <N> --body-file /opt/data/profiles/bruno-barbieri/cron/review_pr<N>.md --event COMMENT
    (never gh pr comment, never issue-level comments)
-3. If "queued_after_this" is not empty: hermes -p bruno-barbieri cron run 5a000660d3d4   (the next PR starts within a minute instead of in 30)
 Then send a short message here: which PR, the review URL, and how many PRs are still queued. If anything fails, say so briefly and do not claim the review was posted. Never reveal the token.

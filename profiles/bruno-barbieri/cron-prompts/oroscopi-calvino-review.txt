@@ -21,5 +21,5 @@ Poi UNA SOLA chiamata al terminale, un unico comando che fa tutto (ogni chiamata
 cat > /opt/data/profiles/bruno-barbieri/cron/calvino_review.md <<'REVIEW'
 <la review>
 REVIEW
-python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/calvino_review.md --event <APPROVE o COMMENT> && <se "queued_after_this" non è vuoto aggiungi: hermes -p bruno-barbieri cron run 088fe5d1ca76>
-Nient'altro: niente gh, niente commenti alle issue, niente etichette, niente altre letture. Poi rispondi nel thread con una riga: PR, esito, numero di correzioni, PR ancora in coda.
+python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/calvino_review.md --event <APPROVE o COMMENT>
+Nient'altro: niente gh, niente commenti alle issue, niente etichette, niente altre letture. Poi rispondi nel thread con una riga: PR, esito, numero di correzioni, PR ancora in coda (la prossima parte da sola entro 5 minuti).
