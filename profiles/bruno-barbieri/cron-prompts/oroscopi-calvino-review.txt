@@ -15,6 +15,7 @@ Scrivi la review in italiano:
 - poi un giudizio di 3 righe; se "not_included_too_long" non è vuoto, scrivi quali file non hai letto;
 - firma: -- Calvino
 Evento: APPROVE solo se non ci sono correzioni E "not_included_too_long" è vuoto; altrimenti COMMENT.
+REGOLA FERMA: se nella review non c'è nessuna correzione ("nessuna nuova correzione", "a posto"), l'evento è APPROVE, non COMMENT. Un COMMENT senza correzioni blocca la PR: nessuno la riapre.
 
 Poi queste azioni:
 1. scrivi la review in /opt/data/profiles/bruno-barbieri/cron/calvino_review.md
