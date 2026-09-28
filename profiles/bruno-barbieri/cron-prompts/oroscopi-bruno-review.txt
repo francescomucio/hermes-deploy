@@ -12,8 +12,9 @@ Review in Bruno's style: direct, pedagogical, culinary metaphors only when they 
 If "not_included_too_long" is not empty, list those files as not reviewed. Sign: -- Bruno
 Event: APPROVE only with no blocking problems AND "not_included_too_long" empty; otherwise COMMENT.
 
-Then these actions:
-1. write the review to /opt/data/profiles/bruno-barbieri/cron/bruno_review.md
-2. python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/bruno_review.md --event APPROVE|COMMENT
-3. If "queued_after_this" is not empty: hermes -p bruno-barbieri cron run 46705e540de3   (the next PR starts within a minute instead of in 30)
-Nothing else: no gh, no issue comments, no labels. In the thread reply with one line: PR, outcome, number of findings.
+Then ONE terminal call only, a single command doing everything (every extra call re-sends the whole context):
+cat > /opt/data/profiles/bruno-barbieri/cron/bruno_review.md <<'REVIEW'
+<the review>
+REVIEW
+python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/bruno_review.md --event <APPROVE or COMMENT> && <if "queued_after_this" is not empty append: hermes -p bruno-barbieri cron run 46705e540de3>
+Nothing else: no gh, no issue comments, no labels, no further reads. Then reply in the thread with one line: PR, outcome, number of findings, PRs still queued.

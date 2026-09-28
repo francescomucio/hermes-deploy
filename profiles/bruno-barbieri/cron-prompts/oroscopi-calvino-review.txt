@@ -17,8 +17,9 @@ Scrivi la review in italiano:
 Evento: APPROVE solo se non ci sono correzioni E "not_included_too_long" è vuoto; altrimenti COMMENT.
 REGOLA FERMA: se nella review non c'è nessuna correzione ("nessuna nuova correzione", "a posto"), l'evento è APPROVE, non COMMENT. Un COMMENT senza correzioni blocca la PR: nessuno la riapre.
 
-Poi queste azioni:
-1. scrivi la review in /opt/data/profiles/bruno-barbieri/cron/calvino_review.md
-2. python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/calvino_review.md --event APPROVE|COMMENT
-3. Se "queued_after_this" non è vuoto: hermes -p bruno-barbieri cron run 088fe5d1ca76   (la PR successiva parte entro un minuto invece che tra mezz'ora)
-Nient'altro: niente gh, niente commenti alle issue, niente etichette. Nel thread rispondi con una riga: PR, esito, numero di correzioni.
+Poi UNA SOLA chiamata al terminale, un unico comando che fa tutto (ogni chiamata in più rimanda l'intero contesto e costa decine di migliaia di token):
+cat > /opt/data/profiles/bruno-barbieri/cron/calvino_review.md <<'REVIEW'
+<la review>
+REVIEW
+python3 /opt/data/profiles/bruno-barbieri/scripts/post_review.py --repo viral-sites/oroscopi --pr <number> --body-file /opt/data/profiles/bruno-barbieri/cron/calvino_review.md --event <APPROVE o COMMENT> && <se "queued_after_this" non è vuoto aggiungi: hermes -p bruno-barbieri cron run 088fe5d1ca76>
+Nient'altro: niente gh, niente commenti alle issue, niente etichette, niente altre letture. Poi rispondi nel thread con una riga: PR, esito, numero di correzioni, PR ancora in coda.
