@@ -94,6 +94,28 @@ proxy is active too, and will tell you clearly if it isn't rather than fail conf
 (google/duckduckgo/etc.) doesn't take news queries down with it. Use it for anything
 current-events-shaped rather than defaulting to general search and hoping.
 
+## Work email access (Gmail API)
+
+You can read Mucio's **work** mailbox, `mucio@untitleddata.company`, through the Gmail API.
+The token lives at `$HERMES_HOME/google_token.json` and auto-refreshes; the deploy wires it up
+at boot, so it should just work.
+
+```bash
+PY=/opt/hermes/.venv/bin/python3    # NB: bare `python3` lacks the google libs
+GAPI="$PY $HERMES_HOME/skills/productivity/google-workspace/scripts/google_api.py"
+$GAPI gmail search "is:unread" --max 10
+$GAPI gmail get MESSAGE_ID
+```
+
+Two mailboxes, two tools — never mix them:
+
+- `mucio@untitleddata.company` (WORK) → Gmail API, as above.
+- `francescomucio@gmail.com` (PERSONAL) → `himalaya` only.
+
+If the Gmail API returns `Not authenticated`, the token symlink is missing — see the
+`work-email` skill. Never send mail without showing Mucio the draft first; that rule holds
+for every profile.
+
 ## Report structure
 
 ```

@@ -387,6 +387,27 @@ fi
 docker exec hermes mkdir -p /opt/data/.config/himalaya /opt/data/home/.config
 docker exec hermes ln -sf /opt/data/.config/himalaya /opt/data/home/.config/himalaya
 
+# Gmail API token for every profile.
+#
+# The OAuth token lives at the deployment-wide $HERMES_HOME/google_token.json
+# (i.e. /opt/data/google_token.json). A named profile runs with
+# HERMES_HOME=/opt/data/profiles/<name>, so its google_api.py looks for the
+# token THERE and finds nothing -> "Not authenticated". The profile dir lives
+# on the persistent volume, so the fix is a symlink that survives restarts.
+# Confirmed live: symlinks are NOT what makes this fragile — rclone's
+# `sync` does not follow/copy symlinks, so a symlink created by hand is
+# silently dropped by the next R2 snapshot and every redeploy. Recreating it
+# here, on every boot, is what makes it durable.
+docker exec hermes sh -c '
+  for d in /opt/data/profiles/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    [ "$name" = "default" ] && continue
+    ln -sfn /opt/data/google_token.json "$d/google_token.json"
+    ln -sfn /opt/data/google_client_secret.json "$d/google_client_secret.json"
+  done
+'
+
 # Set up auto-pull cron (syncs git changes every 5 minutes)
 cat > /usr/local/bin/hermes-sync <<'SYNCEOF'
 #!/bin/bash
@@ -426,6 +447,17 @@ if [ "$BEFORE" != "$AFTER" ]; then
     cp -r "$profile_skills"/* "$dest/"
   done
   chown -R 10000:10000 /root/.hermes/SOUL.md /root/.hermes/profiles/ /root/.hermes/skills/ 2>/dev/null
+  # Token symlinks: rclone does not carry symlinks, so a fresh R2 restore
+  # loses them. Recreate on every sync, same as setup-hermes.sh does at boot.
+  docker exec hermes sh -c '
+    for d in /opt/data/profiles/*/; do
+      [ -d "$d" ] || continue
+      n=$(basename "$d"); [ "$n" = "default" ] && continue
+      ln -sfn /opt/data/google_token.json "$d/google_token.json"
+      ln -sfn /opt/data/google_client_secret.json "$d/google_client_secret.json"
+    done
+  '
+
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) synced $(git log --oneline $BEFORE..$AFTER | wc -l) commit(s)" >> /var/log/hermes-sync.log
 fi
 SYNCEOF
