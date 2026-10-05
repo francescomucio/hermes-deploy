@@ -101,6 +101,7 @@ resource "local_file" "deploy_env" {
     BLIND_USERNAME=${var.blind_username}
     BLIND_PASSWORD=${var.blind_password}
     CAMOFOX_API_KEY=${var.camofox_api_key}
+    DARIO_API_KEY=${var.dario_api_key}
     FORCE_RESTORE=${var.force_restore}
   EOF
 }

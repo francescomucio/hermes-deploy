@@ -61,3 +61,7 @@ email_accounts = [
     default   = true
   },
 ]
+
+# Optional: installs the dario router (non-Claude backends only, see README
+# "dario"). Generate with: openssl rand -hex 32
+# dario_api_key = ""

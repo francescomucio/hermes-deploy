@@ -423,6 +423,26 @@ Reddit) is already set up — recovery script is `terraform/scripts/blind-login.
 Reddit). It only works while Camofox is proxied per the steps above; it detects and reports that
 clearly rather than failing confusingly if not.
 
+## dario (non-Claude model router)
+
+[dario](https://github.com/askalf/dario) runs as an optional standalone container (`dario`, pinned in `setup-hermes.sh`) on `127.0.0.1:3456`, exposing one OpenAI- and Anthropic-compatible endpoint in front of a ChatGPT subscription and/or API-key backends. It is installed only when `dario_api_key` is set in `terraform.tfvars` (`openssl rand -hex 32`).
+
+**Claude is disabled on purpose** (`--no-claude-auth`): routing a Claude subscription through a third-party proxy violates Anthropic's terms and gets accounts banned. Never run `dario login` on this server.
+
+Accounts and backends are added once, interactively, and stored in `/opt/dario-data` (kept out of `/root/.hermes` so the agents can't read the tokens, and therefore **not** in the R2 backup — re-add them after a fresh deploy):
+
+```bash
+# ChatGPT subscription (prints a URL to open in any browser, paste the code back)
+docker exec -it dario node /app/dist/cli.js add altman
+
+# Any OpenAI-compatible API-key backend
+docker exec -it dario node /app/dist/cli.js backend add openrouter --key=sk-or-... --base-url=https://openrouter.ai/api/v1
+
+docker exec dario node /app/dist/cli.js doctor   # what's loaded and routable
+```
+
+Inside the gateway, `DARIO_URL` (`http://127.0.0.1:3456/v1`) and `DARIO_API_KEY` are set. Models are addressed by their ChatGPT slug, or as `<backend>:<model>` for API-key backends. `docker ps` shows the container as "unhealthy" until a ChatGPT account exists (and permanently with API-key backends only) — harmless, use `curl -s 127.0.0.1:3456/livez` instead.
+
 ## Data Persistence
 
 ```
