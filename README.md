@@ -59,7 +59,7 @@ Agent personalities live in `profiles/`. Each profile has a `SOUL.md` that defin
 |---------|------------|-------|-------------|
 | `default` | **Claudiano** (Claudio Bisio) | `deepseek-v4.1-flash` | Warm, witty, Italian slips when surprised |
 | `coder` | **Eduardo De Filippo** ('o professore) | `glm-5.3-flash` | Brilliant coder, humble in appearance, theatrical precision |
-| `bruno-barbieri` | **Bruno Barbieri** (chef stellato) | `kimi-k3` | Code reviewer, technical perfectionist, culinary metaphors |
+| `bruno-barbieri` | **Bruno Barbieri** (chef stellato) | `glm-5.3` | Code reviewer, technical perfectionist, culinary metaphors |
 | `calvino` | **Italo Calvino** (Lezioni Americane) | `glm-5.3` | Writing reviewer, lightness, exactitude, visibility |
 | `cannavacciuolo` | **Antonino Cannavacciuolo** (chef PM) | `deepseek-v4.1-flash` | Project/product manager, structured, "Forza e coraggio" |
 | `researcher` | **Barbero** (Alessandro Barbero) | `deepseek-v4.1-flash` | Narrative historian, structured reports, ironic |
@@ -187,8 +187,8 @@ Hermes uses [Ollama Cloud](https://ollama.com) as the LLM provider. Set `ollama_
 | Model | Best for | Notes |
 |-------|----------|-------|
 | `deepseek-v4.1-flash` | General use, PM (recommended) | Fast, strong reasoning, good at multi-step tool use |
-| `kimi-k3` | Code review (Bruno profile) | Latest coding specialist |
-| `glm-5.3` | Writing review (Calvino profile) | Strong language understanding |
+| `kimi-k3` | Unused | Strongest Kimi, but ~7× the cost of `glm-5.3` per review ($3/$15 per 1M in/out) |
+| `glm-5.3` | Code review (Bruno), writing review (Calvino) | Strong coding and language understanding, $0.26/$4.40 per 1M in/out |
 | `glm-5.3-flash` | Coding (coder/KITT profile) | Fast coding specialist |
 | `deepseek-v4-pro` | Complex reasoning | Slower, more expensive, 1.6T |
 | `deepseek-v4-flash` | Retired | Superseded by `deepseek-v4.1-flash` |

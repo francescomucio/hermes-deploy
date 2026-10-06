@@ -1,6 +1,7 @@
 model:
-  default: kimi-k3
+  default: glm-5.3
   provider: auto
+  base_url: https://ollama.com/v1
 toolsets:
 - kanban
 auxiliary:
