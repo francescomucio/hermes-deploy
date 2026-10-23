@@ -11,9 +11,9 @@ variable "ssh_public_key" {
 
 
 variable "server_type" {
-  description = "Hetzner server type (e.g. cx22, cpx11)"
+  description = "Hetzner server type (e.g. cx23, cx33)"
   type        = string
-  default     = "cx22"
+  default     = "cx33"
 }
 
 variable "location" {

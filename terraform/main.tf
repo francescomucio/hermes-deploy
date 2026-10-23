@@ -49,6 +49,9 @@ resource "hcloud_firewall" "hermes" {
 resource "hcloud_server" "hermes" {
   name        = "hermes"
   server_type = var.server_type
+  # Only read on a server_type change. false = the disk grows with the new type
+  # (cx33 → 80GB), which rules out downgrading below cx33 from then on.
+  keep_disk   = false
   image       = "ubuntu-24.04"
   location    = var.location
   ssh_keys    = [hcloud_ssh_key.hermes.id]
