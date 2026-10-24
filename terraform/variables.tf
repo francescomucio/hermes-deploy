@@ -195,15 +195,8 @@ variable "email_accounts" {
 }
 
 variable "umami_hostname" {
-  description = "Public hostname for the self-hosted Umami (e.g. stats.untitleddata.company). Optional — Umami is not installed when unset. Served through the Cloudflare Tunnel in umami_tunnel_credentials; the tunnel and its DNS route are created outside Terraform (`cloudflared tunnel create` / `route dns`)."
+  description = "Public hostname for the self-hosted Umami (e.g. stats.untitleddata.company). Optional — Umami is not installed when unset. Served through the Cloudflare Tunnel \"hermes\"; tunnel and DNS record are managed here, in the zone formed by the last two labels of the hostname."
   type        = string
-  default     = ""
-}
-
-variable "umami_tunnel_credentials" {
-  description = "Contents of the Cloudflare Tunnel credentials JSON (~/.cloudflared/<tunnel-id>.json) that serves umami_hostname"
-  type        = string
-  sensitive   = true
   default     = ""
 }
 
@@ -226,4 +219,16 @@ variable "umami_db_password" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for Terraform (created by hand): Account → Cloudflare Tunnel Edit; Zone → DNS Edit + Zone Read on the managed zones"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare account ID (same account as the R2 buckets)"
+  type        = string
+  default     = "7cadc6a3832ed2aa72c806180287146f"
 }

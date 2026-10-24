@@ -21,6 +21,7 @@ R2_PATH="r2:hermes-backups/umami"
 
 mkdir -p "$DIR/cloudflared" "$DIR/backups"
 chmod 700 "$DIR"
+TUNNEL_FILES_BEFORE=$(cat "$DIR/cloudflared/credentials.json" "$DIR/cloudflared/config.yml" 2>/dev/null | sha256sum)
 
 install -m 600 /tmp/umami-tunnel.json "$DIR/cloudflared/credentials.json"
 # cloudflared runs as uid 65532 (nonroot) in its image
@@ -105,6 +106,11 @@ if [ ! -d "$DIR/pgdata" ] || [ -z "$(ls -A "$DIR/pgdata" 2>/dev/null)" ]; then
 fi
 
 docker compose up -d --wait
+# cloudflared reads its credentials/config only at startup, and `up -d`
+# doesn't recreate it when just the mounted files changed (new tunnel/secret).
+if [ "$TUNNEL_FILES_BEFORE" != "$(cat "$DIR/cloudflared/credentials.json" "$DIR/cloudflared/config.yml" | sha256sum)" ]; then
+  docker compose restart cloudflared
+fi
 
 cat > /usr/local/bin/umami-backup <<'BACKUPEOF'
 #!/bin/bash

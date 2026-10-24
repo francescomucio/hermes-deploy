@@ -6,6 +6,14 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~> 1.49"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.27"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.8"
+    }
   }
 
   backend "s3" {
@@ -28,6 +36,12 @@ terraform {
 
 provider "hcloud" {
   token = var.hetzner_token
+}
+
+# Bootstrap token, created by hand (Terraform can't own its own credentials):
+# Account → Cloudflare Tunnel Edit, Zone → DNS Edit + Zone Read on the zones.
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 resource "hcloud_ssh_key" "hermes" {
@@ -332,9 +346,46 @@ resource "null_resource" "hermes_snapshot" {
 
 # Umami (optional): self-hosted analytics in its own compose stack
 # (/opt/umami: umami + postgres + cloudflared), reachable only through the
-# Cloudflare Tunnel — no ports opened on the server firewall.
+# Cloudflare Tunnel below — no ports opened on the server firewall.
+locals {
+  umami_enabled = var.umami_hostname != ""
+  # Zone = the last two labels of the hostname (stats.untitleddata.company → untitleddata.company)
+  umami_zone = join(".", slice(split(".", var.umami_hostname), max(0, length(split(".", var.umami_hostname)) - 2), length(split(".", var.umami_hostname))))
+}
+
+data "cloudflare_zone" "umami" {
+  count  = local.umami_enabled ? 1 : 0
+  filter = { name = local.umami_zone }
+}
+
+resource "random_bytes" "tunnel_secret" {
+  count  = local.umami_enabled ? 1 : 0
+  length = 32
+}
+
+# Locally-managed tunnel (config_src = "local"): the ingress rules live in
+# /opt/umami/cloudflared/config.yml, written by setup-umami.sh.
+resource "cloudflare_zero_trust_tunnel_cloudflared" "hermes" {
+  count         = local.umami_enabled ? 1 : 0
+  account_id    = var.cloudflare_account_id
+  name          = "hermes"
+  config_src    = "local"
+  tunnel_secret = random_bytes.tunnel_secret[0].base64
+}
+
+resource "cloudflare_dns_record" "umami" {
+  count   = local.umami_enabled ? 1 : 0
+  zone_id = data.cloudflare_zone.umami[0].zone_id
+  name    = var.umami_hostname
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.hermes[0].id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+  comment = "Umami on the hermes VPS (Cloudflare Tunnel, managed by Terraform)"
+}
+
 resource "local_file" "umami_env" {
-  count           = var.umami_hostname != "" ? 1 : 0
+  count           = local.umami_enabled ? 1 : 0
   filename        = "${path.module}/.rendered/umami.env"
   file_permission = "0600"
   content         = <<-EOF
@@ -342,19 +393,24 @@ resource "local_file" "umami_env" {
     UMAMI_APP_SECRET=${var.umami_app_secret}
     UMAMI_HASH_SALT=${var.umami_hash_salt}
     UMAMI_DB_PASSWORD=${var.umami_db_password}
-    TUNNEL_ID=${try(jsondecode(var.umami_tunnel_credentials).TunnelID, "")}
+    TUNNEL_ID=${cloudflare_zero_trust_tunnel_cloudflared.hermes[0].id}
   EOF
 }
 
+# Same format as the credentials file `cloudflared tunnel create` writes
 resource "local_file" "umami_tunnel_credentials" {
-  count           = var.umami_hostname != "" ? 1 : 0
+  count           = local.umami_enabled ? 1 : 0
   filename        = "${path.module}/.rendered/umami-tunnel.json"
   file_permission = "0600"
-  content         = var.umami_tunnel_credentials
+  content = jsonencode({
+    AccountTag   = var.cloudflare_account_id
+    TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.hermes[0].id
+    TunnelSecret = random_bytes.tunnel_secret[0].base64
+  })
 }
 
 resource "null_resource" "hermes_umami" {
-  count = var.umami_hostname != "" ? 1 : 0
+  count = local.umami_enabled ? 1 : 0
 
   triggers = {
     server_id   = hcloud_server.hermes.id
