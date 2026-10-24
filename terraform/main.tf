@@ -300,3 +300,32 @@ resource "null_resource" "hermes_disk_cleanup" {
     inline = ["chmod +x /tmp/setup-disk-cleanup.sh && /tmp/setup-disk-cleanup.sh"]
   }
 }
+
+# Live → repo snapshot: daily mirror of config.yaml and agent-written skills
+# into the private francescomucio/hermes-live (Hermes is their source of
+# truth). A fresh server generates a new deploy key: the apply prints it, and
+# it has to be added (write access) to hermes-live before snapshots can push.
+resource "null_resource" "hermes_snapshot" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    script_hash = filesha256("${path.module}/scripts/setup-snapshot.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-snapshot.sh"
+    destination = "/tmp/setup-snapshot.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-snapshot.sh && /tmp/setup-snapshot.sh"]
+  }
+}
