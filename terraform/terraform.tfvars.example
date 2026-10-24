@@ -65,3 +65,14 @@ email_accounts = [
 # Optional: installs the dario router (non-Claude backends only, see README
 # "dario"). Generate with: openssl rand -hex 32
 # dario_api_key = ""
+
+# Optional: self-hosted Umami behind a Cloudflare Tunnel (see README "Umami").
+# Create the tunnel first: cloudflared tunnel create hermes-umami &&
+# cloudflared tunnel route dns hermes-umami stats.example.com
+# umami_hostname           = "stats.example.com"
+# umami_tunnel_credentials = <<-EOT
+#   {"AccountTag":"...","TunnelSecret":"...","TunnelID":"..."}
+# EOT
+# umami_app_secret  = ""  # openssl rand -hex 32, or the old install's value
+# umami_hash_salt   = ""  # openssl rand -hex 32, or the old install's value
+# umami_db_password = ""  # openssl rand -hex 32

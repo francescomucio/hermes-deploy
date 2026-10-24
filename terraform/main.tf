@@ -329,3 +329,65 @@ resource "null_resource" "hermes_snapshot" {
     inline = ["chmod +x /tmp/setup-snapshot.sh && /tmp/setup-snapshot.sh"]
   }
 }
+
+# Umami (optional): self-hosted analytics in its own compose stack
+# (/opt/umami: umami + postgres + cloudflared), reachable only through the
+# Cloudflare Tunnel — no ports opened on the server firewall.
+resource "local_file" "umami_env" {
+  count           = var.umami_hostname != "" ? 1 : 0
+  filename        = "${path.module}/.rendered/umami.env"
+  file_permission = "0600"
+  content         = <<-EOF
+    UMAMI_HOSTNAME=${var.umami_hostname}
+    UMAMI_APP_SECRET=${var.umami_app_secret}
+    UMAMI_HASH_SALT=${var.umami_hash_salt}
+    UMAMI_DB_PASSWORD=${var.umami_db_password}
+    TUNNEL_ID=${try(jsondecode(var.umami_tunnel_credentials).TunnelID, "")}
+  EOF
+}
+
+resource "local_file" "umami_tunnel_credentials" {
+  count           = var.umami_hostname != "" ? 1 : 0
+  filename        = "${path.module}/.rendered/umami-tunnel.json"
+  file_permission = "0600"
+  content         = var.umami_tunnel_credentials
+}
+
+resource "null_resource" "hermes_umami" {
+  count = var.umami_hostname != "" ? 1 : 0
+
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.umami_env[0].content_sha256
+    creds_hash  = local_file.umami_tunnel_credentials[0].content_sha256
+    script_hash = filesha256("${path.module}/scripts/setup-umami.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup, null_resource.hermes_backups]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.umami_env[0].filename
+    destination = "/tmp/umami.env"
+  }
+
+  provisioner "file" {
+    source      = local_file.umami_tunnel_credentials[0].filename
+    destination = "/tmp/umami-tunnel.json"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-umami.sh"
+    destination = "/tmp/setup-umami.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-umami.sh && /tmp/setup-umami.sh"]
+  }
+}

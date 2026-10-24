@@ -193,3 +193,37 @@ variable "email_accounts" {
   sensitive = true
   default   = []
 }
+
+variable "umami_hostname" {
+  description = "Public hostname for the self-hosted Umami (e.g. stats.untitleddata.company). Optional — Umami is not installed when unset. Served through the Cloudflare Tunnel in umami_tunnel_credentials; the tunnel and its DNS route are created outside Terraform (`cloudflared tunnel create` / `route dns`)."
+  type        = string
+  default     = ""
+}
+
+variable "umami_tunnel_credentials" {
+  description = "Contents of the Cloudflare Tunnel credentials JSON (~/.cloudflared/<tunnel-id>.json) that serves umami_hostname"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "umami_app_secret" {
+  description = "Umami APP_SECRET. Keep the value from the previous install when migrating — it signs share links and login tokens."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "umami_hash_salt" {
+  description = "Umami HASH_SALT (legacy v2 salt, still read for session hashes). Keep the previous install's value when migrating."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "umami_db_password" {
+  description = "Password of the local Umami Postgres. Generate with: openssl rand -hex 32"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
