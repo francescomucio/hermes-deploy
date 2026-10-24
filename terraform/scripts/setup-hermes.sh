@@ -471,6 +471,10 @@ docker exec hermes sh -c '
 cat > /usr/local/bin/hermes-sync <<'SYNCEOF'
 #!/bin/bash
 cd /opt/hermes-deploy || exit 1
+# The checkout belongs to the container user (Claudiano commits from inside
+# the container), but this pull runs as root: hand back anything it wrote,
+# or root-owned .git/objects dirs make Claudiano's next commit fail.
+trap 'find /opt/hermes-deploy \! -user 10000 -exec chown 10000:10000 {} + 2>/dev/null' EXIT
 BEFORE=$(git rev-parse HEAD)
 git pull --quiet 2>/dev/null || exit 0
 AFTER=$(git rev-parse HEAD)
