@@ -76,3 +76,9 @@ cloudflare_api_token = "your-cloudflare-api-token"
 # umami_app_secret  = ""  # openssl rand -hex 32, or the old install's value
 # umami_hash_salt   = ""  # openssl rand -hex 32, or the old install's value
 # umami_db_password = ""  # openssl rand -hex 32
+
+# Self-hosted GitHub Actions runners (optional), for private repos only. Tokens are
+# fine-grained PATs created by hand: see the github_runners description in variables.tf.
+# github_runners = {
+#   "viral-sites" = { url = "https://github.com/viral-sites", token = "github_pat_..." }
+# }

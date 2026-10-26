@@ -232,3 +232,18 @@ variable "cloudflare_account_id" {
   type        = string
   default     = "7cadc6a3832ed2aa72c806180287146f"
 }
+
+variable "github_runners" {
+  description = <<-EOT
+    Self-hosted GitHub Actions runners on the VPS (scripts/setup-runner.sh), for private repos only.
+    name => { url = "https://github.com/ORG" (org runner) or "https://github.com/OWNER/REPO" (repo runner),
+    token = fine-grained PAT, created by hand: org "Self-hosted runners: Read and write" or repo "Administration: Read and write" }.
+    Empty = no runners.
+  EOT
+  type = map(object({
+    url   = string
+    token = string
+  }))
+  sensitive = true
+  default   = {}
+}

@@ -53,9 +53,9 @@ resource "hcloud_firewall" "hermes" {
   name = "hermes-firewall"
 
   rule {
-    direction = "in"
-    protocol  = "tcp"
-    port      = "22"
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "22"
     source_ips = ["0.0.0.0/0", "::/0"]
   }
 }
@@ -65,10 +65,10 @@ resource "hcloud_server" "hermes" {
   server_type = var.server_type
   # Only read on a server_type change. false = the disk grows with the new type
   # (cx33 → 80GB), which rules out downgrading below cx33 from then on.
-  keep_disk   = false
-  image       = "ubuntu-24.04"
-  location    = var.location
-  ssh_keys    = [hcloud_ssh_key.hermes.id]
+  keep_disk    = false
+  image        = "ubuntu-24.04"
+  location     = var.location
+  ssh_keys     = [hcloud_ssh_key.hermes.id]
   firewall_ids = [hcloud_firewall.hermes.id]
 
   user_data = templatefile("${path.module}/cloud-init.yaml", {
@@ -140,8 +140,8 @@ resource "local_file" "himalaya_config" {
 # Hermes setup: clone repos, pull image, configure
 resource "null_resource" "hermes_setup" {
   triggers = {
-    server_id   = hcloud_server.hermes.id
-    env_hash    = local_file.deploy_env.content_sha256
+    server_id = hcloud_server.hermes.id
+    env_hash  = local_file.deploy_env.content_sha256
     script_hash = sha256(join("", [
       file("${path.module}/scripts/setup-hermes.sh"),
       file("${path.module}/scripts/restore-backup.sh"),
@@ -187,7 +187,7 @@ resource "null_resource" "hermes_setup" {
 # Profile deployment: SOUL.md, himalaya config
 resource "null_resource" "hermes_profiles" {
   triggers = {
-    server_id     = hcloud_server.hermes.id
+    server_id = hcloud_server.hermes.id
     profiles_hash = sha256(join("", [
       file("${path.module}/../profiles/default/SOUL.md"),
       file("${path.module}/../profiles/bruno-barbieri/SOUL.md"),
@@ -445,5 +445,51 @@ resource "null_resource" "hermes_umami" {
 
   provisioner "remote-exec" {
     inline = ["chmod +x /tmp/setup-umami.sh && /tmp/setup-umami.sh"]
+  }
+}
+
+# Self-hosted GitHub Actions runners for the private site repos: one fresh,
+# firewalled container per job, nothing shared with Hermes or Umami.
+locals {
+  runners_enabled = nonsensitive(length(var.github_runners)) > 0
+}
+
+resource "local_sensitive_file" "github_runners" {
+  count           = local.runners_enabled ? 1 : 0
+  filename        = "${path.module}/.rendered/github-runners.tsv"
+  file_permission = "0600"
+  content         = join("", [for name, r in var.github_runners : "${name}\t${r.url}\t${r.token}\n"])
+}
+
+resource "null_resource" "hermes_runners" {
+  count = local.runners_enabled ? 1 : 0
+
+  triggers = {
+    server_id    = hcloud_server.hermes.id
+    runners_hash = local_sensitive_file.github_runners[0].content_sha256
+    script_hash  = filesha256("${path.module}/scripts/setup-runner.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_sensitive_file.github_runners[0].filename
+    destination = "/tmp/github-runners.tsv"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-runner.sh"
+    destination = "/tmp/setup-runner.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-runner.sh && /tmp/setup-runner.sh"]
   }
 }
