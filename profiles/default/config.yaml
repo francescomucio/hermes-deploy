@@ -9,3 +9,11 @@ discord:
     - 1523062947331571864
   require_mention: false
   thread_require_mention: false
+
+auxiliary:
+  compression:
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 300

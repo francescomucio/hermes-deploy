@@ -13,3 +13,11 @@ discord:
   free_response_channels: ''
   require_mention: true
   thread_require_mention: true
+
+auxiliary:
+  compression:
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 300

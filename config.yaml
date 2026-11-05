@@ -190,11 +190,11 @@ auxiliary:
     timeout: 360
     extra_body: {}
   compression:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
-    timeout: 120
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 300
   skills_hub:
     provider: auto
     model: ''

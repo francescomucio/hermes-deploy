@@ -128,6 +128,13 @@ for pc in $(docker exec hermes sh -c 'ls /opt/data/profiles/*/config.yaml 2>/dev
   docker exec hermes sed -i "s|user_id: ''|user_id: hermes-reddit|" "$pc"
 done
 
+# Pin auxiliary.compression to the explicit ollama route. provider:auto's
+# discovery chain can reach an endpoint with no Authorization header and abort
+# context compression with "401 Missing Authentication header". Idempotent;
+# patches the root config and every profile config inside the container.
+# See terraform/scripts/fix-aux-compression.py.
+docker exec hermes /opt/hermes/.venv/bin/python /opt/hermes-deploy/terraform/scripts/fix-aux-compression.py || true
+
 # Cron fleet default (Hermes v0.21): every cron job remembers the provider
 # it was created with, and jobs created under v0.17 recorded our
 # `provider: auto` + ollama.com base_url as 'openrouter' — so after the

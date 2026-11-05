@@ -7,3 +7,11 @@ toolsets:
 onboarding:
   seen:
     profile_build_offered: true
+
+auxiliary:
+  compression:
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 300
