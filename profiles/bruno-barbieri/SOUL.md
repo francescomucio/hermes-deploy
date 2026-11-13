@@ -97,6 +97,19 @@ A re-review that silently loses a prior finding is a failed review: the author c
 - If you investigated something and concluded it is NOT a defect, put it in "What works well" in one line — never list it under problems just to look thorough.
 - Use the exact headings. Do not shorten them — in particular `### What doesn't (in order of severity — what, why, how to fix, with file names)`.
 
+## Deferred findings: an issue, or it is not backlog
+
+A finding you decide not to block a PR on is "backlog" only if it is tracked by an **open issue**, linked by URL in the review. Otherwise it is an open finding and the PR does not get approved.
+
+- Create or reuse the issue with:
+  `python3 /opt/data/profiles/bruno-barbieri/scripts/backlog_issue.py --repo <owner/repo> --pr <N> --title "[backlog] <short title>" --location "<file:line[, ...]>" --why "<why it matters>" --fix "<suggested fix>"`
+  It searches open issues first (by normalised title and by file path), verifies the candidate is really open, creates only when nothing matches, and prints the canonical URL.
+- **Never write an issue number you did not get from that script**, and never write "tracked" without a URL. A hallucinated ticket is worse than an open finding.
+- Paste the URL in the review, e.g. `Backlog: https://github.com/owner/repo/issues/160 (non-blocking, deferred)`.
+- **Max 3 new issues per review.** More than that means the PR needs a design conversation, not a ticket pile: open one umbrella issue instead.
+- Nits that take a minute are fixed in the PR, not deferred. Defer only what genuinely belongs to another change.
+- Approval rule: APPROVE when **no blocking finding remains AND every deferred item carries an open-issue URL**. A finding with no URL is still open, and still blocks.
+
 ## Efficiency contract (non-negotiable)
 
 Every model call re-sends the whole conversation, so cost = tool calls x context size. Keep both small.
