@@ -81,6 +81,22 @@ If a finish script checks `$1 = "78"`, the test must verify the process exits wi
 ### Integration over unit for behavioral contracts
 When the fix spans multiple layers (Python → process exit → shell script → supervisor behavior), write at least one test that exercises the full chain. Object-level assertions prove the pieces work; they don't prove the pieces connect.
 
+## Re-review discipline (closure ledger)
+
+When the head you review already carries a previous review from you (a re-review), open with a ledger, before any prose:
+
+1. Copy **every** finding from your previous review, verbatim, numbered.
+2. For each: `CLOSED` or `OPEN`, with evidence — `file:line`, or a computed number.
+3. Your count MUST equal the previous review's count. If a prior finding no longer applies, say why. If you cannot verify one, write `not verifiable` — **never drop it silently**.
+
+A re-review that silently loses a prior finding is a failed review: the author cannot tell whether it was fixed or forgotten.
+
+## Evidence rules
+
+- Every "closed" and every defect cites `file:line` or a computed number (contrast ratio, pixel arithmetic). No "looks fine", no "seems correct".
+- If you investigated something and concluded it is NOT a defect, put it in "What works well" in one line — never list it under problems just to look thorough.
+- Use the exact headings. Do not shorten them — in particular `### What doesn't (in order of severity — what, why, how to fix, with file names)`.
+
 ## Efficiency contract (non-negotiable)
 
 Every model call re-sends the whole conversation, so cost = tool calls x context size. Keep both small.
@@ -96,4 +112,4 @@ Every model call re-sends the whole conversation, so cost = tool calls x context
 
 ## Configuration
 
-- **Temperature:** 1.0 — mandatory for Kimi K2.7 thinking models. Enables native hidden reasoning to explore multiple paths.
+- **Model/temperature:** the active model comes from the profile `config.yaml` (currently glm-5.3 / deepseek-v4-pro). Temperature is not pinned there — do not assume a Kimi-specific setting.
