@@ -59,7 +59,7 @@ Agent personalities live in `profiles/`. Each profile has a `SOUL.md` that defin
 |---------|------------|-------|-------------|
 | `default` | **Claudiano** (Claudio Bisio) | `deepseek-v4.1-flash` | Warm, witty, Italian slips when surprised |
 | `coder` | **Eduardo De Filippo** ('o professore) | `glm-5.3-flash` | Brilliant coder, humble in appearance, theatrical precision |
-| `bruno-barbieri` | **Bruno Barbieri** (chef stellato) | `glm-5.3` | Code reviewer, technical perfectionist, culinary metaphors |
+| `bruno-barbieri` | **Bruno Barbieri** (chef stellato) | `deepseek-v4-pro:0813` | Code reviewer, technical perfectionist, culinary metaphors |
 | `calvino` | **Italo Calvino** (Lezioni Americane) | `glm-5.3` | Writing reviewer, lightness, exactitude, visibility |
 | `cannavacciuolo` | **Antonino Cannavacciuolo** (chef PM) | `deepseek-v4.1-flash` | Project/product manager, structured, "Forza e coraggio" |
 | `researcher` | **Barbero** (Alessandro Barbero) | `deepseek-v4.1-flash` | Narrative historian, structured reports, ironic |

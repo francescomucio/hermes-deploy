@@ -1,5 +1,5 @@
 model:
-  default: glm-5.3
+  default: deepseek-v4-pro:0813
   provider: auto
   base_url: https://ollama.com/v1
 toolsets:

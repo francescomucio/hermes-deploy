@@ -114,7 +114,7 @@ ROOT_MAX_TURNS=$(docker exec hermes sed -n '0,/^  max_turns: /{s/^  max_turns: /
 ROOT_AUTO_THREAD=$(docker exec hermes sed -n '0,/^  auto_thread: /{s/^  auto_thread: //p}' /opt/data/config.yaml)
 #
 # The model is the exception: some profiles deliberately run a different one
-# (Bruno kimi-k3, KITT glm-5.3-flash, Calvino glm-5.3). Copying the root model
+# (Bruno deepseek-v4-pro, KITT glm-5.3-flash, Calvino glm-5.3). Copying the root model
 # over them silently flattened every bot onto the default's model on each
 # deploy (found 2026-09-25). Each profile's model comes from its config.yaml
 # in this repo — the source of truth — falling back to the root model only
