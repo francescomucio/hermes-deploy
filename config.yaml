@@ -179,16 +179,15 @@ auxiliary:
     provider: openai
     model: gemma4:31b
     base_url: https://ollama.com/v1
-    api_key: ''
+    key_env: OLLAMA_API_KEY
     timeout: 120
     download_timeout: 30
   web_extract:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 360
-    extra_body: {}
   compression:
     provider: openai
     model: deepseek-v4.1-flash
@@ -196,65 +195,64 @@ auxiliary:
     key_env: OLLAMA_API_KEY
     timeout: 300
   skills_hub:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 30
   approval:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
-    timeout: 30
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 60
   mcp:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 30
   title_generation:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 30
-    language: ''
   tts_audio_tags:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 30
   triage_specifier:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 120
   kanban_decomposer:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 180
   profile_describer:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 60
   curator:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
-    timeout: 600
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
+    timeout: 120
   monitor:
-    provider: auto
-    model: ''
-    base_url: ''
-    api_key: ''
+    provider: openai
+    model: deepseek-v4.1-flash
+    base_url: https://ollama.com/v1
+    key_env: OLLAMA_API_KEY
     timeout: 60
 display:
   compact: false

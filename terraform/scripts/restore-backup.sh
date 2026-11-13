@@ -132,8 +132,8 @@ done
 # discovery chain can reach an endpoint with no Authorization header and abort
 # context compression with "401 Missing Authentication header". Idempotent;
 # patches the root config and every profile config inside the container.
-# See terraform/scripts/fix-aux-compression.py.
-docker exec hermes /opt/hermes/.venv/bin/python /opt/hermes-deploy/terraform/scripts/fix-aux-compression.py || true
+# See terraform/scripts/fix-aux-routes.py.
+docker exec hermes /opt/hermes/.venv/bin/python /opt/hermes-deploy/terraform/scripts/fix-aux-routes.py || true
 
 # Cron fleet default (Hermes v0.21): every cron job remembers the provider
 # it was created with, and jobs created under v0.17 recorded our

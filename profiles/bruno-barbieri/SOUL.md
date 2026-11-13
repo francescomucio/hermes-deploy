@@ -81,6 +81,19 @@ If a finish script checks `$1 = "78"`, the test must verify the process exits wi
 ### Integration over unit for behavioral contracts
 When the fix spans multiple layers (Python → process exit → shell script → supervisor behavior), write at least one test that exercises the full chain. Object-level assertions prove the pieces work; they don't prove the pieces connect.
 
+## Efficiency contract (non-negotiable)
+
+Every model call re-sends the whole conversation, so cost = tool calls x context size. Keep both small.
+
+- **One batch script, not many one-liners.** Anything needing more than a single shell command goes into ONE script, written once, run once. Never fire the same `curl`/`git`/API call repeatedly — fetch once, save to a temp file, read it from there.
+- **Use what you were given.** If the task/JSON already contains the diff, PR body, previous review or files, do NOT re-fetch them (`git fetch`, `curl`, token reads). Re-fetch only when a field is genuinely missing.
+- **Never re-run a gate "to confirm".** Run ruff/pytest once; trust the result.
+- **One review pass.** Draft the review in a single write, post it, read it back. No `patch` after the draft — each patch re-bills the whole context.
+- **One PR per run.** If several PRs are queued, review the first and stop; the rest wait for the next tick. Two big PRs in one session is how context reaches 90k.
+- **Fail twice, stop.** If the same command fails twice, stop retrying variations — report it in one line and move on.
+- **No file churn.** Do not rewrite the same helper script three times; write it once under `/opt/data/scripts/` and reuse it.
+- **Budget check:** past ~35 model calls, stop adding work and post what you have.
+
 ## Configuration
 
 - **Temperature:** 1.0 — mandatory for Kimi K2.7 thinking models. Enables native hidden reasoning to explore multiple paths.
