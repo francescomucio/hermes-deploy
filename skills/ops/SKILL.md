@@ -145,6 +145,43 @@ Check current version:
 docker exec hermes hermes --version
 ```
 
+## web_search returns 0 results (SearXNG engines blocked)
+
+Symptom: `web_search` succeeds but returns 0 hits for ordinary queries. Network is fine
+(APIs, curl, RSS all work) — the engines are blocked, not the host.
+
+Diagnose from inside the container:
+```bash
+curl -s -G http://127.0.0.1:8080/search \
+  --data-urlencode "q=test query" --data-urlencode "format=json" | head -c 800
+```
+`unresponsive_engines` names the blocked ones (`CAPTCHA`, `Suspended: CAPTCHA`, `too many
+requests`). `google` fails *silently* (0 results, no error), so always read that field.
+
+Then probe which engines still answer from this IP:
+```bash
+curl -s -G http://127.0.0.1:8080/search --data-urlencode "q=!szn test query" --data-urlencode "format=json"
+curl -s -G http://127.0.0.1:8080/search --data-urlencode "q=test query" --data-urlencode "format=json" --data-urlencode "categories=web"
+curl -s http://127.0.0.1:8080/config   # enabled engines, categories, shortcuts
+```
+An `engines=<name>` param only works for engines already in the queried category; a `!shortcut`
+bang works for any loaded engine, so it is the reliable per-engine probe.
+
+Two fix paths:
+- **Host side (needs Docker — no profile has the socket):**
+  `ssh root@<server> 'bash -s' < terraform/scripts/fix-searxng-engines.sh` re-writes
+  `/opt/searxng/settings.yml` (seznam/bing carry `general`, blocked engines `disabled: true`),
+  restarts SearXNG and verifies with three queries. SearXNG reads settings only at start.
+- **Agent side (no host access):** route search to a keyless backend that answers from this IP:
+  `hermes -p <profile> config set web.search_backend exa` (anonymous Exa tier; the keyless ring
+  fails over to parallel/firecrawl/keenable on rate limits). Apply to the root config **and**
+  every profile config, then mirror into `/opt/hermes-deploy` — the repo is the deploy source of
+  truth and a redeploy overwrites live configs. Set per-profile values with
+  `hermes -p <name> config set`, not by editing the file: the file tools refuse to write Hermes
+  configs, and `HERMES_PROFILE=<x> hermes config path` still prints the root config.
+- Verify with real queries (trivial, technical, current-events) through `web_search` itself.
+  "It should work now" is not a verification.
+
 ## Important Notes
 
 - The server's local disk is **not persistent** — all data is backed up to R2 once a day (03:00 UTC).
