@@ -90,3 +90,14 @@ auxiliary:
     base_url: https://ollama.com/v1
     key_env: OLLAMA_API_KEY
     timeout: 300
+
+web:
+  backend: ''
+  # SearXNG's general-category engines (google/ddg/startpage/brave) are CAPTCHA-blocked
+  # from this host's IP, so its default general category returns nothing. Search goes to
+  # Exa's anonymous keyless tier instead (no key; the keyless ring fails over to
+  # parallel/firecrawl/keenable on rate limits). Once the SearXNG side is fixed (enable a
+  # live engine in `general` — terraform/scripts/fix-searxng-engines.sh), set this back
+  # to 'searxng'.
+  search_backend: exa
+  extract_backend: ''

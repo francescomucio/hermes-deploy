@@ -176,7 +176,9 @@ services:
 COMPEOF
 sed -i "s|__HERMES_IMAGE__|$HERMES_IMAGE|g" /opt/hermes/docker-compose.override.yml
 
-# Create SearXNG config
+# Create SearXNG config. Canonical engine list also lives in
+# terraform/scripts/fix-searxng-engines.sh — keep the two in sync (setup-hermes.sh is copied
+# to /tmp alone on deploy, so it cannot read a sibling file).
 mkdir -p /opt/searxng
 cat > /opt/searxng/settings.yml <<'SEARXEOF'
 use_default_settings: true
@@ -192,22 +194,44 @@ search:
     - json
 
 engines:
+  # --- general search: the engines that actually answer from this host's IP ---
+  # seznam carries general search (relevant results, no CAPTCHA from the Hetzner IP).
+  - name: seznam
+    engine: seznam
+    shortcut: szn
+    categories: [general, web]
+  # bing answers too, but its parsed results are weak (often only the first query word
+  # matches) — kept as a second opinion, not the primary.
+  - name: bing
+    engine: bing
+    shortcut: bi
+    categories: [general, web]
+  # --- general search: dead from this host, disabled until the block clears ---
+  # Left configured-but-disabled rather than removed: google's block is volume-driven and
+  # may cool down on its own (README "Google — not solved"). No `proxies:` override here —
+  # the home-IP SOCKS5 tunnel is opt-in and started manually (`ssh -R 1080 ...`), not a
+  # standing service; pointing google at 127.0.0.1:1080 unconditionally made every query
+  # fail with a bare "proxy error" whenever the tunnel wasn't running.
+  # No `reddit` engine either: reddit.com/search.json hard-requires an authenticated
+  # session, which SearXNG's engine can't provide. Use browser_navigate with the persisted
+  # Camofox Reddit login instead (see researcher/SOUL.md).
   - name: google
     engine: google
     shortcut: g
-  # No proxies: override here — the home-IP SOCKS5 tunnel is opt-in,
-  # started manually (`ssh -R 1080 ...`), not a standing service. Pointing
-  # this engine at 127.0.0.1:1080 unconditionally meant every query failed
-  # with a bare "proxy error" whenever the tunnel wasn't running, i.e.
-  # almost always. Tested extensively and the tunnel doesn't change
-  # Google's outcome either way (see README's "Google" section) — nothing
-  # to wire up a proxy for right now.
-  # No `reddit` engine: reddit.com/search.json hard-requires an authenticated
-  # session, which SearXNG's engine can't provide. Use browser_navigate with
-  # the persisted Camofox Reddit login instead (see researcher/SOUL.md).
+    disabled: true
   - name: duckduckgo
     engine: duckduckgo
     shortcut: ddg
+    disabled: true
+  - name: startpage
+    engine: startpage
+    shortcut: sp
+    disabled: true
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: true
+
   - name: wikipedia
     engine: wikipedia
     shortcut: wp

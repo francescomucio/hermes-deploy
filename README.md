@@ -376,6 +376,36 @@ from general search (`google`/`duckduckgo`/etc.), added so a block on the genera
 doesn't take news queries down with it. `duckduckgo`/`wikipedia`/`github` (general search) remain
 reliable fallbacks in the meantime too.
 
+### General search went dark (2026-11) — fixed with `seznam` + `bing`
+
+By mid-November 2026 the general category had gone completely dark: `google` silently returned
+nothing, `duckduckgo` → `CAPTCHA`, `startpage` → `Suspended: CAPTCHA`, `brave` → `too many
+requests`, all from the Hetzner IP. So `/search?format=json` answered 0 results for ordinary
+queries while every other kind of egress (APIs, RSS, `curl`) kept working — the tell that it was
+the engines, not the network or the container. Probed one engine at a time: `seznam` and `bing`
+still answer from this IP (`bing`'s parsed results are weak, often matching only the first query
+word, hence the second-opinion role), while `mojeek`/`qwant`/`presearch`/`yahoo` return
+`access denied`/`HTTP protocol error`.
+
+Two layers to the fix:
+
+- **SearXNG side** — `seznam` + `bing` now carry the `general` category and the four blocked
+  engines are `disabled: true` (they only cost their timeouts). Canonical list lives in
+  `terraform/scripts/setup-hermes.sh` and `terraform/scripts/fix-searxng-engines.sh`. SearXNG
+  only reads `settings.yml` at start, so re-applying needs a host-side restart:
+
+  ```bash
+  ssh root@$(terraform output -raw server_ip) 'bash -s' < terraform/scripts/fix-searxng-engines.sh
+  ```
+
+  Operator action, like the Camofox/proxy items above — the agent container has no Docker socket
+  and no `/opt/searxng` mount.
+- **Hermes side** — `web.search_backend: exa` in every profile and the root `config.yaml`, which
+  routes `web_search` to Exa's **anonymous keyless tier** (no key; the keyless ring fails over to
+  `parallel`/`firecrawl`/`keenable` on rate limits). Verified from this host for trivial,
+  technical and current-events queries while SearXNG's general category was empty. Once SearXNG
+  answers again, set `search_backend` back to `searxng` for local, quota-free search.
+
 ### Blind and Glassdoor — solved, but needs an operator-proxied Camofox
 
 Unlike Google, these two are a genuine IP-reputation block, not a request-pattern one — confirmed
