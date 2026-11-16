@@ -337,7 +337,9 @@ ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
 CapabilityBoundingSet=
-RestrictAddressFamilies=AF_INET AF_INET6
+# AF_NETLINK/AF_UNIX: wireguard-go needs them to bring the interface up
+# ("Unable to update bind: address family not supported by protocol").
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 MemoryMax=128M
 
 [Install]
