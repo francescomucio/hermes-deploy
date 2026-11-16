@@ -6,16 +6,11 @@ not Reddit-specific despite the name) into Blind (teamblind.com).
 Unlike Reddit, Blind is blocked at the CDN edge (CloudFront) by IP
 reputation, not by an auth wall — reachable from a real browser on the
 operator's home IP, not from this server's datacenter IP directly. That
-means this script only works when BOTH of these are true:
-
-  1. The operator has the home-IP SOCKS5 tunnel running
-     (`ssh -R 1080 root@<server-ip> -N`, see README).
-  2. Camofox is currently launched with PROXY_HOST=127.0.0.1
-     PROXY_PORT=1080 pointed at that tunnel (not the default — Camofox
-     normally runs unproxied, since most sites don't need it and a
-     dead tunnel would otherwise break every navigation. Recreating
-     the container with the proxy vars is an operator action, not
-     something Claudiano/Barbero can do themselves — no Docker access).
+means this script only works while Camofox exits via the home IP:
+the home VPN egress (wireproxy-home, SOCKS5 on 127.0.0.1:1080, see
+README "Home VPN egress") is configured, home_vpn_camofox is on, and
+the tunnel is up. Both are set up by terraform, not by the agents (no
+Docker access).
 
 Safe to run any time, including speculatively: it checks whether the
 persisted session is already valid before attempting anything, and
@@ -107,9 +102,9 @@ def main():
     if is_blocked(snapshot):
         call("DELETE", f"/tabs/{tab_id}?userId={CAMOFOX_USER_ID}")
         print("Blind is blocking this request (CloudFront IP-reputation block).")
-        print("This means the operator's home-IP tunnel isn't active, or Camofox")
-        print("isn't currently proxied through it — not something fixable from")
-        print("here. Ask the operator to start the tunnel and re-proxy Camofox.")
+        print("This means Camofox isn't exiting via the home IP: the home VPN")
+        print("(wireproxy-home) is down or not configured, or home_vpn_camofox is")
+        print("off. Not fixable from here — ask the operator to check it.")
         sys.exit(1)
 
     if is_logged_in(snapshot):

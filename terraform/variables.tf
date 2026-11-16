@@ -247,3 +247,39 @@ variable "github_runners" {
   sensitive = true
   default   = {}
 }
+
+# Home VPN egress: Hermes's Camofox browser exits via the home connection
+# (WireGuard server on the home ASUS router), so sites that block datacenter
+# IPs (Blind, Glassdoor) see the home IP instead. Optional — nothing is
+# installed when home_vpn_client_private_key is unset. Values come from the
+# router's WireGuard client "hetzner-hermes" (see README "Home VPN egress").
+variable "home_vpn_endpoint" {
+  description = "Home router WireGuard endpoint, host:port (e.g. xxxx.asuscomm.com:51820)"
+  type        = string
+  default     = ""
+}
+
+variable "home_vpn_server_public_key" {
+  description = "Public key of the home router's WireGuard server"
+  type        = string
+  default     = ""
+}
+
+variable "home_vpn_client_private_key" {
+  description = "Private key of the router's WireGuard client for this server. Optional — home VPN egress is disabled when unset."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "home_vpn_client_address" {
+  description = "Tunnel address the router assigned to this client"
+  type        = string
+  default     = "10.6.0.2/32"
+}
+
+variable "home_vpn_camofox" {
+  description = "Route the Camofox browser through the home VPN (only takes effect when the home VPN is configured)"
+  type        = bool
+  default     = true
+}

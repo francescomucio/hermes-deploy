@@ -164,21 +164,43 @@ ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 # Then open http://localhost:9119
 ```
 
-### Search proxy tunnel (SOCKS5, opt-in)
+### Home VPN egress (WireGuard via the home router, always on)
 
-Available infrastructure, not part of the default path for anything right now — see
-"Camofox Browser Automation" below for why. Opens a reverse SOCKS5 proxy on the server, tunneled
-back through your own machine's connection, using the server's existing sshd (no firewall
-changes, no extra ports):
+Replaces the old manual `ssh -R 1080` tunnel, which only worked while the laptop was on. The home
+ASUS router runs a WireGuard server; the VPS connects to it with
+[wireproxy](https://github.com/windtf/wireproxy) (userspace WireGuard → SOCKS5 on
+`127.0.0.1:1080`, systemd unit `wireproxy-home`, sandboxed, no root). Nothing else on the server
+changes: no kernel interface, no routes, so SSH/Discord/Ollama/email still leave directly from
+Hetzner. Only what is explicitly pointed at the proxy — **Camofox** (see below) — exits via the
+home IP. SearXNG engines stay direct (the proxy doesn't help Google; see "Google").
+
+Safety:
+- Router side: WireGuard "Access Intranet" is **off** (`wgs1_lanaccess=0`) — VPN clients get
+  internet only, no home LAN.
+- VPS side: `AllowedIPs` is the public IPv4 internet only (RFC1918, CGNAT, loopback, link-local,
+  multicast and reserved ranges excluded), so nothing using the proxy can reach the router
+  (`10.6.0.1`/`192.168.x`) either. DNS goes through the tunnel to `1.1.1.1`/`9.9.9.9`.
+- The home IP changes nightly (1&1 PPPoE reconnect, 04:00); the router updates its ASUS DDNS name
+  and `wireproxy-home-check.timer` restarts the tunnel within ~5 min when the probe fails.
+
+Setup (one-time, on the router — UI: VPN → VPN Server → WireGuard, or over SSH):
+1. ASUS DDNS on (WAN → DDNS), WireGuard server on, Access Intranet off.
+2. Add a client named `hetzner-hermes`.
+3. Put its values in `terraform.tfvars` (`home_vpn_endpoint`, `home_vpn_server_public_key`,
+   `home_vpn_client_private_key`, `home_vpn_client_address`), then `terraform apply`.
+   Over SSH: `nvram get wgs1_pub` (server public key), `nvram get wgs1_c1_priv` (client private
+   key), `nvram get wgs1_c1_addr` (client address, IPv4 part).
+
+Leaving `home_vpn_client_private_key` empty disables all of it (the unit is removed, Camofox
+goes direct). `home_vpn_camofox = false` keeps the tunnel up but Camofox direct.
+
+Check from the VPS:
 
 ```bash
-ssh -R 1080 root@$(terraform output -raw server_ip) -N
+curl -s --socks5-hostname 127.0.0.1:1080 https://api.ipify.org   # → home IP
+systemctl status wireproxy-home wireproxy-home-check.timer
+journalctl -u wireproxy-home-check -n 20                        # restarts after IP changes
 ```
-
-SearXNG's `google` engine has a `proxies: socks5://127.0.0.1:1080` entry that uses this when
-it's up — kept for reference, but testing showed it doesn't actually fix Google's CAPTCHA
-(blocked with or without it; see below), so don't expect it to help. `duckduckgo`/`wikipedia`/
-`github`/news engines never use it and are unaffected either way.
 
 ## Choosing a Model
 
@@ -280,14 +302,15 @@ container means the *host's* loopback, where the `hermes` container's API access
 networking removes Docker's own per-container port isolation. Deployed by
 `terraform/scripts/setup-hermes.sh`.
 
-**No proxy by default** (`PROXY_HOST`/`PROXY_PORT` unset). This was tried both ways: the search
-proxy tunnel doesn't help Google (blocked either way, see below) and isn't needed for Reddit once
-the session is persisted (cookies browse fine without it — the proxy only seemed to matter for a
-*fresh* login, and even that's confounded by attempt-spacing rather than cleanly isolated to the
-proxy itself). Routing through it also has a real cost: it burns the *home* IP's reputation with
-whatever site is being accessed, for no confirmed benefit. Revisit empirically if a future Reddit
-re-login genuinely needs it — SOCKS5 proxying (`PROXY_PROTOCOL=socks5`) is still there, just
-unused by default.
+**Proxied via the home VPN when it's configured** (`PROXY_HOST=127.0.0.1`, `PROXY_PORT=1080`,
+`PROXY_PROTOCOL=socks5`, see [Home VPN egress](#home-vpn-egress-wireguard-via-the-home-router-always-on));
+direct otherwise. The old reason for keeping Camofox direct was that the manual `ssh -R` tunnel
+was usually down, which broke all browsing; the router tunnel is always on (and self-heals
+after the nightly IP change). Known effects, from earlier testing with the manual tunnel: fixes
+Blind and Glassdoor (see below), doesn't help Google, not needed for a persisted Reddit session.
+Cost: every Camofox visit spends the *home* IP's reputation with that site — set
+`home_vpn_camofox = false` to go back to direct. The setup script recreates the container when
+the proxy setting changes (persisted logins survive on the volume).
 
 **Memory**: the container is capped at `--memory=1536m` so a runaway browser gets OOM-killed inside
 its own cgroup rather than triggering the host-wide OOM killer (which picks the biggest process —
@@ -406,52 +429,26 @@ Two layers to the fix:
   technical and current-events queries while SearXNG's general category was empty. Once SearXNG
   answers again, set `search_backend` back to `searxng` for local, quota-free search.
 
-### Blind and Glassdoor — solved, but needs an operator-proxied Camofox
+### Blind and Glassdoor — solved via the home VPN
 
 Unlike Google, these two are a genuine IP-reputation block, not a request-pattern one — confirmed
 directly: Blind returns a CloudFront-cached 403 (a static "Oops! Something went wrong" page,
 `x-cache: Error from cloudfront`) and Glassdoor returns a Cloudflare Challenge
 (`cf-mitigated: challenge`) from this server's datacenter IP, on both a plain `curl` *and* a real
-Camofox browser. Routed through the [search proxy tunnel](#search-proxy-tunnel-socks5-opt-in)
-instead, both load cleanly — but only when Camofox itself is relaunched to actually use that
-proxy, since a plain `curl` through the same tunnel still gets blocked (these sites fingerprint
-the request, not just the IP — a real browser is required either way).
+Camofox browser. Through a home-IP proxy both load cleanly — but only in Camofox, since a plain
+`curl` through the same proxy still gets blocked (these sites fingerprint the request, not just
+the IP — a real browser is required either way).
 
-Camofox does **not** proxy by default (see above — the tunnel is opt-in/manual, and a Camofox
-that depends on it would break Reddit and everything else whenever the tunnel isn't running,
-which is most of the time). Enabling this is an operator action, not something Claudiano/Barbero
-can do themselves (no Docker access):
-
-```bash
-# 1. Start the tunnel from your laptop (separate terminal, leave running):
-terraform output -raw search_proxy_tunnel   # then run the printed command
-
-# 2. Recreate Camofox proxied through it (same volume, sessions/cookies preserved):
-ssh root@$(terraform output -raw server_ip)
-docker rm -f camofox-browser
-docker run -d --restart unless-stopped --name camofox-browser \
-  --network host --memory=1536m --memory-swap=2048m --shm-size=1g \
-  -v /opt/camofox-data:/root/.camofox \
-  -e CAMOFOX_BIND_HOST=127.0.0.1 \
-  -e MAX_OLD_SPACE_SIZE=512 \
-  -e BROWSER_RSS_RESTART_THRESHOLD_MB=1000 \
-  -e CAMOFOX_CRASH_REPORT_ENABLED=false \
-  -e PROXY_HOST=127.0.0.1 \
-  -e PROXY_PORT=1080 \
-  -e PROXY_PROTOCOL=socks5 \
-  camofox-browser:<tag>   # match the currently running image tag
-
-# 3. When done, revert to the unproxied default so Reddit/general browsing
-#    don't silently break the next time the tunnel isn't running: re-run
-#    setup-hermes.sh (terraform apply), which recreates the container from
-#    its own flags since this one lacks the run-rev label.
-```
+With [Home VPN egress](#home-vpn-egress-wireguard-via-the-home-router-always-on) configured and
+`home_vpn_camofox = true` (the default), Camofox is proxied permanently, so this works without
+any operator action. (Before the router tunnel this needed the laptop's `ssh -R` tunnel plus a
+manual Camofox recreate.)
 
 A persisted, logged-in Blind session (Camofox userId `hermes-reddit`, same fixed identity as
 Reddit) is already set up — recovery script is `terraform/scripts/blind-login.py`
 (`blind_username`/`blind_password` in `terraform.tfvars`, same narrow-credentials-file pattern as
-Reddit). It only works while Camofox is proxied per the steps above; it detects and reports that
-clearly rather than failing confusingly if not.
+Reddit). It only works while Camofox is proxied; it detects and reports that clearly rather than
+failing confusingly if not.
 
 ## dario (non-Claude model router)
 

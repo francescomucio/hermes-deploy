@@ -119,6 +119,11 @@ resource "local_file" "deploy_env" {
     BLIND_PASSWORD=${var.blind_password}
     CAMOFOX_API_KEY=${var.camofox_api_key}
     DARIO_API_KEY=${var.dario_api_key}
+    HOME_VPN_ENDPOINT=${var.home_vpn_endpoint}
+    HOME_VPN_SERVER_PUBLIC_KEY=${var.home_vpn_server_public_key}
+    HOME_VPN_CLIENT_PRIVATE_KEY=${var.home_vpn_client_private_key}
+    HOME_VPN_CLIENT_ADDRESS=${var.home_vpn_client_address}
+    HOME_VPN_CAMOFOX=${var.home_vpn_camofox}
     FORCE_RESTORE=${var.force_restore}
   EOF
 }

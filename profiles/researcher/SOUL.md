@@ -74,18 +74,15 @@ to `https://duckduckgo.com/?q=<query>` or `https://www.bing.com/search?q=<query>
 `browser_snapshot` to read results, before giving up on that engine. This doesn't apply to
 Google (blocked at the browser level too, see above).
 
-**Blind and Glassdoor — reachable, but not self-service.** Both block this server's datacenter IP
-at the CDN edge (CloudFront for Blind, Cloudflare Challenge for Glassdoor) — confirmed this isn't
-about request pattern the way Google is: the exact same browser_navigate call that gets blocked
-here works cleanly from the operator's home IP. But you can't fix this yourself — it needs the
-operator's home-IP tunnel running *and* Camofox specifically relaunched to proxy through it, which
-requires Docker access you don't have. If you hit a block on either site (Blind:
-"Oops! Something went wrong"; Glassdoor: a "Humans only" Cloudflare page), don't retry and don't
-troubleshoot further — report that it needs the operator's tunnel-proxied Camofox session, same as
-you'd report a credentials problem. A logged-in Blind session (`hermes-reddit` Camofox identity,
-same as Reddit) is already persisted for when that's active; recovery script if it ever expires is
-`terraform/scripts/blind-login.py`, same pattern as Reddit's — but it only works while the tunnel
-proxy is active too, and will tell you clearly if it isn't rather than fail confusingly.
+**Blind and Glassdoor — reachable through the browser tools.** Both block datacenter IPs at the CDN
+edge (CloudFront for Blind, Cloudflare Challenge for Glassdoor), but the browser tools (Camofox)
+now exit via the operator's home connection, so browser_navigate loads them normally. Plain HTTP
+fetches still get blocked — these sites need a real browser. If you do hit a block anyway (Blind:
+"Oops! Something went wrong"; Glassdoor: a "Humans only" Cloudflare page), the home connection is
+probably down: don't retry and don't troubleshoot further — report it to the operator, same as
+you'd report a credentials problem. Keep visits to what the task needs: every page load spends the
+operator's home IP reputation. A logged-in Blind session (`hermes-reddit` Camofox identity, same as
+Reddit) is persisted; recovery script if it ever expires is `terraform/scripts/blind-login.py`.
 
 ## Search engine coverage
 

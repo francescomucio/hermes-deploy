@@ -208,10 +208,10 @@ engines:
     categories: [general, web]
   # --- general search: dead from this host, disabled until the block clears ---
   # Left configured-but-disabled rather than removed: google's block is volume-driven and
-  # may cool down on its own (README "Google — not solved"). No `proxies:` override here —
-  # the home-IP SOCKS5 tunnel is opt-in and started manually (`ssh -R 1080 ...`), not a
-  # standing service; pointing google at 127.0.0.1:1080 unconditionally made every query
-  # fail with a bare "proxy error" whenever the tunnel wasn't running.
+  # may cool down on its own (README "Google — not solved"). No `proxies:` override here,
+  # on purpose: the home-IP SOCKS5 proxy on 127.0.0.1:1080 is always up now (wireproxy-home,
+  # "Home VPN egress" below), but testing showed it doesn't change Google's outcome and it
+  # would spend the home IP's reputation on scraped queries. Only Camofox uses it.
   # No `reddit` engine either: reddit.com/search.json hard-requires an authenticated
   # session, which SearXNG's engine can't provide. Use browser_navigate with the persisted
   # Camofox Reddit login instead (see researcher/SOUL.md).
@@ -265,6 +265,127 @@ SEARXEOF
 # Restart SearXNG to pick up the new settings (only this container, no
 # impact on the gateway/dashboard or Discord bot connections)
 docker restart searxng >/dev/null 2>&1 || true
+
+# Home VPN egress: wireproxy is a userspace WireGuard client that exposes the
+# tunnel to the home router as a SOCKS5 proxy on 127.0.0.1:1080. Nothing else
+# on the server changes: no kernel interface, no routes, so SSH/Discord/
+# Ollama/email keep going out directly from Hetzner. Only what is explicitly
+# pointed at the proxy (Camofox, see below) exits via the home IP.
+# Replaces the old manual `ssh -R 1080` tunnel, which only worked while the
+# laptop was on — this one is always up.
+#
+# AllowedIPs = the public IPv4 internet only (0.0.0.0/0 minus RFC1918,
+# CGNAT, loopback, link-local, multicast, reserved). wireguard-go drops
+# anything else, so nothing using the proxy can reach the home router
+# (10.6.0.1 / 192.168.x) or the home LAN — on top of the router's own
+# "Access Intranet: off". DNS goes through the tunnel to a public resolver
+# for the same reason (not the router's 10.6.0.1).
+WIREPROXY_VERSION="v1.1.3"
+WIREPROXY_SHA256="e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c"
+WIREPROXY_ALLOWED_IPS="1.0.0.0/8, 2.0.0.0/7, 4.0.0.0/6, 8.0.0.0/7, 11.0.0.0/8, 12.0.0.0/6, 16.0.0.0/4, 32.0.0.0/3, 64.0.0.0/3, 96.0.0.0/6, 100.0.0.0/10, 100.128.0.0/9, 101.0.0.0/8, 102.0.0.0/7, 104.0.0.0/5, 112.0.0.0/5, 120.0.0.0/6, 124.0.0.0/7, 126.0.0.0/8, 128.0.0.0/3, 160.0.0.0/5, 168.0.0.0/8, 169.0.0.0/9, 169.128.0.0/10, 169.192.0.0/11, 169.224.0.0/12, 169.240.0.0/13, 169.248.0.0/14, 169.252.0.0/15, 169.255.0.0/16, 170.0.0.0/7, 172.0.0.0/12, 172.32.0.0/11, 172.64.0.0/10, 172.128.0.0/9, 173.0.0.0/8, 174.0.0.0/7, 176.0.0.0/4, 192.0.1.0/24, 192.0.2.0/23, 192.0.4.0/22, 192.0.8.0/21, 192.0.16.0/20, 192.0.32.0/19, 192.0.64.0/18, 192.0.128.0/17, 192.1.0.0/16, 192.2.0.0/15, 192.4.0.0/14, 192.8.0.0/13, 192.16.0.0/12, 192.32.0.0/11, 192.64.0.0/10, 192.128.0.0/11, 192.160.0.0/13, 192.169.0.0/16, 192.170.0.0/15, 192.172.0.0/14, 192.176.0.0/12, 192.192.0.0/10, 193.0.0.0/8, 194.0.0.0/7, 196.0.0.0/7, 198.0.0.0/12, 198.16.0.0/15, 198.20.0.0/14, 198.24.0.0/13, 198.32.0.0/11, 198.64.0.0/10, 198.128.0.0/9, 199.0.0.0/8, 200.0.0.0/5, 208.0.0.0/4"
+HOME_VPN_ENABLED=false
+if [ -n "${HOME_VPN_CLIENT_PRIVATE_KEY:-}" ] && [ -n "${HOME_VPN_SERVER_PUBLIC_KEY:-}" ] && [ -n "${HOME_VPN_ENDPOINT:-}" ]; then
+  HOME_VPN_ENABLED=true
+  if ! /usr/local/bin/wireproxy --version 2>/dev/null | grep -qx "wireproxy, version ${WIREPROXY_VERSION#v}"; then
+    echo "Installing wireproxy $WIREPROXY_VERSION..."
+    TMP_WP=$(mktemp -d)
+    curl -fsSL -o "$TMP_WP/wp.tgz" "https://github.com/windtf/wireproxy/releases/download/$WIREPROXY_VERSION/wireproxy_linux_amd64.tar.gz"
+    echo "$WIREPROXY_SHA256  $TMP_WP/wp.tgz" | sha256sum -c --quiet
+    tar -xzf "$TMP_WP/wp.tgz" -C "$TMP_WP" wireproxy
+    install -m 0755 "$TMP_WP/wireproxy" /usr/local/bin/wireproxy
+    rm -rf "$TMP_WP"
+  fi
+
+  install -d -m 0700 /etc/wireproxy
+  umask 077
+  cat > /etc/wireproxy/home.conf <<WPEOF
+[Interface]
+Address = ${HOME_VPN_CLIENT_ADDRESS:-10.6.0.2/32}
+PrivateKey = $HOME_VPN_CLIENT_PRIVATE_KEY
+DNS = 1.1.1.1, 9.9.9.9
+
+[Peer]
+PublicKey = $HOME_VPN_SERVER_PUBLIC_KEY
+Endpoint = $HOME_VPN_ENDPOINT
+AllowedIPs = $WIREPROXY_ALLOWED_IPS
+PersistentKeepalive = 25
+
+[Socks5]
+BindAddress = 127.0.0.1:1080
+WPEOF
+  umask 022
+  /usr/local/bin/wireproxy --configtest --config /etc/wireproxy/home.conf
+
+  # Sandboxed: no root, no writable filesystem, no capabilities. The config
+  # (root-only, holds the private key) is handed over as a systemd credential;
+  # %d is the credentials directory.
+  cat > /etc/systemd/system/wireproxy-home.service <<'UNITEOF'
+[Unit]
+Description=wireproxy: SOCKS5 127.0.0.1:1080 via home router WireGuard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/wireproxy --config %d/home.conf
+Restart=always
+RestartSec=10
+LoadCredential=home.conf:/etc/wireproxy/home.conf
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
+  # Health check every 5 min: WireGuard resolves the asuscomm.com endpoint
+  # only at start, so after the home IP changes (nightly PPPoE reconnect at
+  # 04:00) the tunnel goes dead until restarted. Probe through the proxy and
+  # restart on failure.
+  cat > /etc/systemd/system/wireproxy-home-check.service <<'UNITEOF'
+[Unit]
+Description=Restart wireproxy-home if the home tunnel is dead
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'curl -sf --max-time 15 --socks5-hostname 127.0.0.1:1080 -o /dev/null https://1.1.1.1/cdn-cgi/trace || { echo "home tunnel down, restarting"; systemctl restart wireproxy-home; }'
+UNITEOF
+  cat > /etc/systemd/system/wireproxy-home-check.timer <<'UNITEOF'
+[Unit]
+Description=Check the home tunnel every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+UNITEOF
+  systemctl daemon-reload
+  systemctl enable wireproxy-home wireproxy-home-check.timer >/dev/null 2>&1
+  systemctl restart wireproxy-home
+  systemctl start wireproxy-home-check.timer
+else
+  # Disabled: tear down any previous install so nothing listens on 1080.
+  if [ -f /etc/systemd/system/wireproxy-home.service ]; then
+    systemctl disable --now wireproxy-home wireproxy-home-check.timer >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/wireproxy-home.service /etc/systemd/system/wireproxy-home-check.service /etc/systemd/system/wireproxy-home-check.timer
+    systemctl daemon-reload
+  fi
+  rm -rf /etc/wireproxy
+fi
+
+# Camofox proxy settings: through the home VPN when enabled, direct otherwise.
+CAMOFOX_PROXY_HOST=""
+if [ "$HOME_VPN_ENABLED" = true ] && [ "${HOME_VPN_CAMOFOX:-true}" = true ]; then
+  CAMOFOX_PROXY_HOST="127.0.0.1"
+fi
 
 # Camofox: self-hosted anti-detection browser server (browser_navigate/etc.
 # tools). Own standalone container, independent of docker-compose — gateway
@@ -326,8 +447,10 @@ if docker ps -a --format '{{.Names}}' | grep -qx camofox-browser; then
   [ "$(docker inspect camofox-browser --format '{{index .Config.Labels "hermes.camofox.run-rev"}}')" = "$CAMOFOX_RUN_REV" ] || NEEDS_RECREATE=true
   CURRENT_CAMOFOX_KEY=$(docker inspect camofox-browser --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^CAMOFOX_API_KEY=//p')
   [ "$CURRENT_CAMOFOX_KEY" = "${CAMOFOX_API_KEY:-}" ] || NEEDS_RECREATE=true
+  CURRENT_CAMOFOX_PROXY=$(docker inspect camofox-browser --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^PROXY_HOST=//p')
+  [ "$CURRENT_CAMOFOX_PROXY" = "$CAMOFOX_PROXY_HOST" ] || NEEDS_RECREATE=true
   if [ "$NEEDS_RECREATE" = true ]; then
-    echo "Camofox container outdated (volume/networking/image/flags/API key), recreating..."
+    echo "Camofox container outdated (volume/networking/image/flags/API key/proxy), recreating..."
     docker rm -f camofox-browser
     # A recreate isn't a fresh install: persisted logins survive on the volume.
     CAMOFOX_RECREATED=true
@@ -345,9 +468,11 @@ else
   # CAMOFOX_BIND_HOST: with host networking there's no per-container port
   # isolation, so bind loopback explicitly (defense-in-depth on top of the
   # Hetzner firewall only allowing port 22 in).
-  # No PROXY_HOST/PROXY_PORT by default: tested both ways, no confirmed
-  # benefit for Google or a persisted Reddit session, and it burns the home
-  # IP's reputation. See README.
+  # PROXY_HOST/PORT/PROTOCOL: set only when the home VPN is configured and
+  # home_vpn_camofox is on (CAMOFOX_PROXY_HOST above). Then Camofox exits via
+  # the home IP through wireproxy's always-on SOCKS5 — what Blind/Glassdoor
+  # need (see README). No confirmed benefit for Google, and it spends the home
+  # IP's reputation, so set home_vpn_camofox = false to turn it off.
   # Memory: --memory caps the whole container so a runaway browser gets
   # OOM-killed inside its own cgroup instead of triggering the host-wide
   # OOM killer (which picks the biggest process — often Hermes itself).
@@ -369,6 +494,7 @@ else
     -e BROWSER_RSS_RESTART_THRESHOLD_MB=1000 \
     -e CAMOFOX_CRASH_REPORT_ENABLED=false \
     -e CAMOFOX_API_KEY="${CAMOFOX_API_KEY:-}" \
+    ${CAMOFOX_PROXY_HOST:+-e PROXY_HOST="$CAMOFOX_PROXY_HOST" -e PROXY_PORT=1080 -e PROXY_PROTOCOL=socks5} \
     "$CAMOFOX_IMAGE"
   [ "${CAMOFOX_RECREATED:-false}" = true ] || CAMOFOX_FRESH_INSTALL=true
 fi

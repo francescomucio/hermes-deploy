@@ -66,6 +66,15 @@ email_accounts = [
 # "dario"). Generate with: openssl rand -hex 32
 # dario_api_key = ""
 
+# Optional: home VPN egress — Camofox browses via your home connection
+# (WireGuard server on the home router, client "hetzner-hermes"). See README
+# "Home VPN egress". Disabled when home_vpn_client_private_key is unset.
+# home_vpn_endpoint           = "xxxxxxxx.asuscomm.com:51820"
+# home_vpn_server_public_key  = ""
+# home_vpn_client_private_key = ""
+# home_vpn_client_address     = "10.6.0.2/32"
+# home_vpn_camofox            = true
+
 # Cloudflare token for Terraform, created by hand (Account → Cloudflare Tunnel
 # Edit; Zone → DNS Edit + Zone Read on the zones Terraform manages)
 cloudflare_api_token = "your-cloudflare-api-token"
