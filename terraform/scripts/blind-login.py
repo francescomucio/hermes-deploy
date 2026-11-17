@@ -84,6 +84,25 @@ def is_logged_in(snapshot_text):
     return any(marker in snapshot_text for marker in LOGGED_IN_MARKERS)
 
 
+def snapshot_of(tab_id):
+    return call("GET", f"/tabs/{tab_id}/snapshot?userId={CAMOFOX_USER_ID}")["snapshot"]
+
+
+def wait_for(tab_id, ready, timeout=30):
+    """Poll the snapshot until ready(snapshot) is true, instead of a fixed
+    sleep: through the home VPN, page loads and the sign-in dialog take a
+    few seconds longer, and Camofox briefly returns an empty snapshot while
+    the page is busy. Returns the last snapshot either way."""
+    deadline = time.time() + timeout
+    snap = ""
+    while time.time() < deadline:
+        snap = snapshot_of(tab_id)
+        if snap and ready(snap):
+            return snap
+        time.sleep(1)
+    return snap
+
+
 def open_homepage():
     tab = call("POST", "/tabs", {
         "userId": CAMOFOX_USER_ID,
@@ -91,9 +110,8 @@ def open_homepage():
         "url": "https://www.teamblind.com/",
     })
     tab_id = tab["tabId"]
-    time.sleep(4)
-    snap = call("GET", f"/tabs/{tab_id}/snapshot?userId={CAMOFOX_USER_ID}")
-    return tab_id, snap["snapshot"]
+    snap = wait_for(tab_id, lambda s: is_blocked(s) or is_logged_in(s) or find_ref(s, "Sign in") is not None, timeout=45)
+    return tab_id, snap
 
 
 def main():
@@ -116,8 +134,7 @@ def main():
     agree_ref = find_ref(snapshot, "AGREE")
     if agree_ref:
         call("POST", f"/tabs/{tab_id}/click", {"userId": CAMOFOX_USER_ID, "ref": agree_ref})
-        time.sleep(2)
-        snapshot = call("GET", f"/tabs/{tab_id}/snapshot?userId={CAMOFOX_USER_ID}")["snapshot"]
+        snapshot = wait_for(tab_id, lambda s: find_ref(s, "Sign in") is not None, timeout=15)
 
     signin_ref = find_ref(snapshot, "Sign in")
     if not signin_ref:
@@ -127,8 +144,7 @@ def main():
         sys.exit(1)
 
     call("POST", f"/tabs/{tab_id}/click", {"userId": CAMOFOX_USER_ID, "ref": signin_ref})
-    time.sleep(2)
-    snapshot = call("GET", f"/tabs/{tab_id}/snapshot?userId={CAMOFOX_USER_ID}")["snapshot"]
+    snapshot = wait_for(tab_id, lambda s: find_ref(s, "Email or Login ID") and find_ref(s, "Password"), timeout=30)
 
     user_ref = find_ref(snapshot, "Email or Login ID")
     pass_ref = find_ref(snapshot, "Password")
@@ -144,12 +160,10 @@ def main():
     call("POST", f"/tabs/{tab_id}/type", {"userId": CAMOFOX_USER_ID, "ref": user_ref, "text": username})
     call("POST", f"/tabs/{tab_id}/type", {"userId": CAMOFOX_USER_ID, "ref": pass_ref, "text": password})
     call("POST", f"/tabs/{tab_id}/click", {"userId": CAMOFOX_USER_ID, "ref": submit_ref})
-    time.sleep(3)
-
-    check = call("GET", f"/tabs/{tab_id}/snapshot?userId={CAMOFOX_USER_ID}")
+    check = wait_for(tab_id, is_logged_in, timeout=30)
     call("DELETE", f"/tabs/{tab_id}?userId={CAMOFOX_USER_ID}")
 
-    if is_logged_in(check["snapshot"]):
+    if is_logged_in(check):
         print("Blind login OK — session persisted under Camofox userId:", CAMOFOX_USER_ID)
     else:
         print("WARNING: could not confirm login succeeded, check manually")
