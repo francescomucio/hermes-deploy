@@ -7,6 +7,7 @@ discord:
   free_response_channels:
     - 1523051402727915550
     - 1523062947331571864
+    - 1574900283971080324
   require_mention: false
   thread_require_mention: false
 
