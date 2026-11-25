@@ -124,6 +124,7 @@ resource "local_file" "deploy_env" {
     HOME_VPN_CLIENT_PRIVATE_KEY=${var.home_vpn_client_private_key}
     HOME_VPN_CLIENT_ADDRESS=${var.home_vpn_client_address}
     HOME_VPN_CAMOFOX=${var.home_vpn_camofox}
+    HOME_VPN_WEB=${var.home_vpn_web}
     FORCE_RESTORE=${var.force_restore}
   EOF
 }

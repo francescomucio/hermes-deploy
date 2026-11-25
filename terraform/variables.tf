@@ -283,3 +283,9 @@ variable "home_vpn_camofox" {
   type        = bool
   default     = true
 }
+
+variable "home_vpn_web" {
+  description = "Route the agents' web traffic (web_search/web_extract/curl/SearXNG) through the home VPN; Ollama/Discord/GitHub/Google APIs stay direct. Only takes effect when the home VPN is configured"
+  type        = bool
+  default     = true
+}

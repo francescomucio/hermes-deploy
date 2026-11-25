@@ -169,10 +169,16 @@ ssh -L 9119:127.0.0.1:9119 root@$(terraform output -raw server_ip)
 Replaces the old manual `ssh -R 1080` tunnel, which only worked while the laptop was on. The home
 ASUS router runs a WireGuard server; the VPS connects to it with
 [wireproxy](https://github.com/windtf/wireproxy) (userspace WireGuard → SOCKS5 on
-`127.0.0.1:1080`, systemd unit `wireproxy-home`, sandboxed, no root). Nothing else on the server
-changes: no kernel interface, no routes, so SSH/Discord/Ollama/email still leave directly from
-Hetzner. Only what is explicitly pointed at the proxy — **Camofox** (see below) — exits via the
-home IP. SearXNG engines stay direct (the proxy doesn't help Google; see "Google").
+`127.0.0.1:1080`, plus HTTP on `127.0.0.1:1081`; systemd unit `wireproxy-home`, sandboxed, no
+root). No kernel interface, no routes: SSH, email and R2 backups still leave directly from Hetzner.
+What exits via the home IP:
+- **Camofox** (`home_vpn_camofox`, see below).
+- **The agents' web traffic** (`home_vpn_web`, default on): the gateway gets
+  `HTTP(S)_PROXY=http://127.0.0.1:1081`, so `web_search`, `web_extract`, curl and git-over-https from
+  the terminal go through home; SearXNG gets `outgoing.proxies` (SOCKS). `NO_PROXY` keeps Ollama,
+  Discord, GitHub, Cursor, Google APIs, Nous and R2 direct, so the bots stay up when the home
+  connection is down — only web lookups and the browser fail then. To add another direct
+  endpoint, extend `WEB_NO_PROXY` in `setup-hermes.sh`.
 
 Safety:
 - Router side: WireGuard "Access Intranet" is **off** (`wgs1_lanaccess=0`) — VPN clients get
@@ -190,9 +196,14 @@ Setup (one-time, on the router — UI: VPN → VPN Server → WireGuard, or over
    `home_vpn_client_private_key`, `home_vpn_client_address`), then `terraform apply`.
    Over SSH: `nvram get wgs1_pub` (server public key), `nvram get wgs1_c1_priv` (client private
    key), `nvram get wgs1_c1_addr` (client address, IPv4 part).
+   Careful when setting the client over SSH: `wgs1_c1_aips` is the *router-side* AllowedIPs (`10.6.0.2/32`),
+   `wgs1_c1_caips` the client's (`0.0.0.0/0`). Swapped, the router sends the whole home internet into the
+   tunnel. After a router factory reset, all of this (and DDNS) is gone — see the casa runbook
+   ("Router after a factory reset") in the workspace repo.
 
 Leaving `home_vpn_client_private_key` empty disables all of it (the unit is removed, Camofox
-goes direct). `home_vpn_camofox = false` keeps the tunnel up but Camofox direct.
+goes direct). `home_vpn_camofox = false` keeps the tunnel up but Camofox direct;
+`home_vpn_web = false` does the same for the gateway and SearXNG.
 
 Check from the VPS:
 

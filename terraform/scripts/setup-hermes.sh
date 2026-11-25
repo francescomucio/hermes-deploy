@@ -8,6 +8,26 @@ set +a
 
 echo "=== Hermes Setup ==="
 
+# Home VPN egress (details in the wireproxy section below). Decided up front
+# because the gateway .env and SearXNG settings, written before that section,
+# depend on it.
+HOME_VPN_ENABLED=false
+if [ -n "${HOME_VPN_CLIENT_PRIVATE_KEY:-}" ] && [ -n "${HOME_VPN_SERVER_PUBLIC_KEY:-}" ] && [ -n "${HOME_VPN_ENDPOINT:-}" ]; then
+  HOME_VPN_ENABLED=true
+fi
+# Agent web traffic (web_search/web_extract/curl/git-over-https/SearXNG) via the
+# home VPN's HTTP proxy on 127.0.0.1:1081. Infrastructure endpoints stay direct
+# (NO_PROXY), so the bots keep talking to Ollama/Discord/GitHub when the home
+# connection is down — only web lookups fail then.
+HOME_VPN_WEB_ACTIVE=false
+WEB_PROXY_URL=""
+WEB_NO_PROXY=""
+if [ "$HOME_VPN_ENABLED" = true ] && [ "${HOME_VPN_WEB:-true}" = true ]; then
+  HOME_VPN_WEB_ACTIVE=true
+  WEB_PROXY_URL="http://127.0.0.1:1081"
+  WEB_NO_PROXY="localhost,127.0.0.1,::1,host.docker.internal,ollama.com,discord.com,discordapp.com,discordapp.net,discord.gg,discord.media,github.com,githubusercontent.com,githubassets.com,cursor.sh,cursor.com,googleapis.com,accounts.google.com,nousresearch.com,luma.com,cloudflarestorage.com,r2.dev"
+fi
+
 # Swap: the cx23 has 3.8GB RAM and the four gateways alone idle at ~1.7GB.
 # Without swap, any single ~1GB spike (Camoufox, a bot's git/node/pyright
 # process) hit the global OOM killer — 30 kills in 30 days, taking out
@@ -125,6 +145,8 @@ HERMES_USER_TIMEZONE=$USER_TIMEZONE
 SEARXNG_URL=http://127.0.0.1:8080
 CAMOFOX_URL=http://127.0.0.1:9377
 DARIO_API_KEY=$DARIO_API_KEY
+WEB_PROXY_URL=$WEB_PROXY_URL
+WEB_NO_PROXY=$WEB_NO_PROXY
 EOF
 
 # Write docker-compose.override.yml (uses pre-built image, no build needed)
@@ -157,6 +179,14 @@ services:
       - CAMOFOX_URL=http://127.0.0.1:9377
       - DARIO_URL=http://127.0.0.1:3456/v1
       - DARIO_API_KEY=${DARIO_API_KEY}
+      # Home VPN web egress (empty = direct). Both cases: curl only reads
+      # lowercase http_proxy, Python reads either.
+      - HTTP_PROXY=${WEB_PROXY_URL:-}
+      - HTTPS_PROXY=${WEB_PROXY_URL:-}
+      - http_proxy=${WEB_PROXY_URL:-}
+      - https_proxy=${WEB_PROXY_URL:-}
+      - NO_PROXY=${WEB_NO_PROXY:-}
+      - no_proxy=${WEB_NO_PROXY:-}
 
   dashboard:
     image: __HERMES_IMAGE__
@@ -208,10 +238,9 @@ engines:
     categories: [general, web]
   # --- general search: dead from this host, disabled until the block clears ---
   # Left configured-but-disabled rather than removed: google's block is volume-driven and
-  # may cool down on its own (README "Google — not solved"). No `proxies:` override here,
-  # on purpose: the home-IP SOCKS5 proxy on 127.0.0.1:1080 is always up now (wireproxy-home,
-  # "Home VPN egress" below), but testing showed it doesn't change Google's outcome and it
-  # would spend the home IP's reputation on scraped queries. Only Camofox uses it.
+  # may cool down on its own (README "Google — not solved"). With home VPN web egress on,
+  # every engine goes out via the home IP (`outgoing.proxies`, appended below) — testing
+  # showed that alone doesn't unblock Google, so it stays disabled.
   # No `reddit` engine either: reddit.com/search.json hard-requires an authenticated
   # session, which SearXNG's engine can't provide. Use browser_navigate with the persisted
   # Camofox Reddit login instead (see researcher/SOUL.md).
@@ -262,15 +291,31 @@ engines:
     shortcut: bin
 SEARXEOF
 
+# Home VPN web egress: all SearXNG engine requests go out via the home IP.
+# The marker file tells fix-searxng-engines.sh (which rewrites settings.yml
+# on its own) to append the same block.
+if [ "$HOME_VPN_WEB_ACTIVE" = true ]; then
+  cat >> /opt/searxng/settings.yml <<'SEARXEOF'
+
+outgoing:
+  proxies:
+    all://: socks5h://127.0.0.1:1080
+SEARXEOF
+  touch /opt/searxng/.home-vpn-proxy
+else
+  rm -f /opt/searxng/.home-vpn-proxy
+fi
+
 # Restart SearXNG to pick up the new settings (only this container, no
 # impact on the gateway/dashboard or Discord bot connections)
 docker restart searxng >/dev/null 2>&1 || true
 
 # Home VPN egress: wireproxy is a userspace WireGuard client that exposes the
-# tunnel to the home router as a SOCKS5 proxy on 127.0.0.1:1080. Nothing else
-# on the server changes: no kernel interface, no routes, so SSH/Discord/
-# Ollama/email keep going out directly from Hetzner. Only what is explicitly
-# pointed at the proxy (Camofox, see below) exits via the home IP.
+# tunnel to the home router as SOCKS5 on 127.0.0.1:1080 and HTTP on :1081.
+# No kernel interface, no routes, so SSH/email/R2 backups keep going out
+# directly from Hetzner. What is pointed at the proxy exits via the home IP:
+# Camofox (home_vpn_camofox), SearXNG and the gateway's web traffic
+# (home_vpn_web, NO_PROXY keeps Ollama/Discord/GitHub/Google APIs direct).
 # Replaces the old manual `ssh -R 1080` tunnel, which only worked while the
 # laptop was on — this one is always up.
 #
@@ -283,9 +328,7 @@ docker restart searxng >/dev/null 2>&1 || true
 WIREPROXY_VERSION="v1.1.3"
 WIREPROXY_SHA256="e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c"
 WIREPROXY_ALLOWED_IPS="1.0.0.0/8, 2.0.0.0/7, 4.0.0.0/6, 8.0.0.0/7, 11.0.0.0/8, 12.0.0.0/6, 16.0.0.0/4, 32.0.0.0/3, 64.0.0.0/3, 96.0.0.0/6, 100.0.0.0/10, 100.128.0.0/9, 101.0.0.0/8, 102.0.0.0/7, 104.0.0.0/5, 112.0.0.0/5, 120.0.0.0/6, 124.0.0.0/7, 126.0.0.0/8, 128.0.0.0/3, 160.0.0.0/5, 168.0.0.0/8, 169.0.0.0/9, 169.128.0.0/10, 169.192.0.0/11, 169.224.0.0/12, 169.240.0.0/13, 169.248.0.0/14, 169.252.0.0/15, 169.255.0.0/16, 170.0.0.0/7, 172.0.0.0/12, 172.32.0.0/11, 172.64.0.0/10, 172.128.0.0/9, 173.0.0.0/8, 174.0.0.0/7, 176.0.0.0/4, 192.0.1.0/24, 192.0.2.0/23, 192.0.4.0/22, 192.0.8.0/21, 192.0.16.0/20, 192.0.32.0/19, 192.0.64.0/18, 192.0.128.0/17, 192.1.0.0/16, 192.2.0.0/15, 192.4.0.0/14, 192.8.0.0/13, 192.16.0.0/12, 192.32.0.0/11, 192.64.0.0/10, 192.128.0.0/11, 192.160.0.0/13, 192.169.0.0/16, 192.170.0.0/15, 192.172.0.0/14, 192.176.0.0/12, 192.192.0.0/10, 193.0.0.0/8, 194.0.0.0/7, 196.0.0.0/7, 198.0.0.0/12, 198.16.0.0/15, 198.20.0.0/14, 198.24.0.0/13, 198.32.0.0/11, 198.64.0.0/10, 198.128.0.0/9, 199.0.0.0/8, 200.0.0.0/5, 208.0.0.0/4"
-HOME_VPN_ENABLED=false
-if [ -n "${HOME_VPN_CLIENT_PRIVATE_KEY:-}" ] && [ -n "${HOME_VPN_SERVER_PUBLIC_KEY:-}" ] && [ -n "${HOME_VPN_ENDPOINT:-}" ]; then
-  HOME_VPN_ENABLED=true
+if [ "$HOME_VPN_ENABLED" = true ]; then
   if ! /usr/local/bin/wireproxy --version 2>/dev/null | grep -qx "wireproxy, version ${WIREPROXY_VERSION#v}"; then
     echo "Installing wireproxy $WIREPROXY_VERSION..."
     TMP_WP=$(mktemp -d)
@@ -312,6 +355,11 @@ PersistentKeepalive = 25
 
 [Socks5]
 BindAddress = 127.0.0.1:1080
+
+# HTTP CONNECT proxy for the gateway's HTTP(S)_PROXY (every client speaks it;
+# SOCKS would need extra Python packages).
+[http]
+BindAddress = 127.0.0.1:1081
 WPEOF
   umask 022
   /usr/local/bin/wireproxy --configtest --config /etc/wireproxy/home.conf
@@ -356,7 +404,7 @@ Description=Restart wireproxy-home if the home tunnel is dead
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'curl -sf --max-time 15 --socks5-hostname 127.0.0.1:1080 -o /dev/null https://1.1.1.1/cdn-cgi/trace || { echo "home tunnel down, restarting"; systemctl restart wireproxy-home; }'
+ExecStart=/bin/sh -c 'curl -sf --max-time 15 --socks5-hostname 127.0.0.1:1080 -o /dev/null https://1.1.1.1/cdn-cgi/trace && curl -sf --max-time 15 --proxy http://127.0.0.1:1081 -o /dev/null https://1.1.1.1/cdn-cgi/trace || { echo "home tunnel down, restarting"; systemctl restart wireproxy-home; }'
 UNITEOF
   cat > /etc/systemd/system/wireproxy-home-check.timer <<'UNITEOF'
 [Unit]

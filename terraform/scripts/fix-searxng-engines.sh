@@ -55,10 +55,9 @@ engines:
     categories: [general, web]
   # --- general search: dead from this host, disabled until the block clears ---
   # Left configured-but-disabled rather than removed: google's block is volume-driven and
-  # may cool down on its own (README "Google — not solved"). No `proxies:` override here —
-  # the home-IP SOCKS5 tunnel is opt-in and started manually (`ssh -R 1080 ...`), not a
-  # standing service; pointing google at 127.0.0.1:1080 unconditionally made every query
-  # fail with a bare "proxy error" whenever the tunnel wasn't running.
+  # may cool down on its own (README "Google — not solved"). With home VPN web egress on,
+  # every engine goes out via the home IP (`outgoing.proxies`, appended below) — testing
+  # showed that alone doesn't unblock Google, so it stays disabled.
   # No `reddit` engine either: reddit.com/search.json hard-requires an authenticated
   # session, which SearXNG's engine can't provide. Use browser_navigate with the persisted
   # Camofox Reddit login instead (see researcher/SOUL.md).
@@ -108,6 +107,15 @@ engines:
     engine: bing_news
     shortcut: bin
 SEARXEOF
+# Home VPN web egress (setup-hermes.sh leaves this marker when it's on).
+if [ -f /opt/searxng/.home-vpn-proxy ]; then
+  cat >> "$DEST" <<'SEARXEOF'
+
+outgoing:
+  proxies:
+    all://: socks5h://127.0.0.1:1080
+SEARXEOF
+fi
 echo "installed $DEST"
 
 docker restart searxng >/dev/null

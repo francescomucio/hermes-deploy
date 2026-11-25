@@ -74,6 +74,7 @@ email_accounts = [
 # home_vpn_client_private_key = ""
 # home_vpn_client_address     = "10.6.0.2/32"
 # home_vpn_camofox            = true
+# home_vpn_web                = true
 
 # Cloudflare token for Terraform, created by hand (Account → Cloudflare Tunnel
 # Edit; Zone → DNS Edit + Zone Read on the zones Terraform manages)
