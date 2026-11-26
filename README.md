@@ -320,7 +320,7 @@ container means the *host's* loopback, where the `hermes` container's API access
 (`127.0.0.1:9377`) actually lives. Bound to loopback only at the application level
 (`CAMOFOX_BIND_HOST=127.0.0.1`) for defense-in-depth, since host
 networking removes Docker's own per-container port isolation. Deployed by
-`terraform/scripts/setup-hermes.sh`.
+`terraform/scripts/setup-camofox.sh` (`null_resource.hermes_camofox`).
 
 **Proxied via the home VPN when it's configured** (`PROXY_HOST=127.0.0.1`, `PROXY_PORT=1080`,
 `PROXY_PROTOCOL=socks5`, see [Home VPN egress](#home-vpn-egress-wireguard-via-the-home-router-always-on));
@@ -348,12 +348,12 @@ into a session directly — handy for bootstrapping a login (e.g. sign in once b
 cookies, import them) without fighting a site's bot/CAPTCHA defenses through automation. Disabled
 (403) unless `CAMOFOX_API_KEY` is set on the container, auth'd via `Authorization: Bearer
 <key>`. Set `camofox_api_key` in `terraform.tfvars` (generate with `openssl rand -hex 32`) to
-enable it — `setup-hermes.sh` passes it through and recreates the container on any change to it.
+enable it — `setup-camofox.sh` passes it through and recreates the container on any change to it.
 Left unset by default; everything else (navigation, persisted Reddit login, etc.) works without it.
 
 ### Version pinning and upgrades
 
-Pinned in `setup-hermes.sh` to a release tag (`CAMOFOX_REF`, currently `v1.17.0`) plus the
+Pinned in `setup-camofox.sh` to a release tag (`CAMOFOX_REF`, currently `v1.17.0`) plus the
 Camoufox browser build it expects (`CAMOUFOX_VERSION`/`CAMOUFOX_RELEASE`, currently
 `152.0.4`/`beta.28`). To upgrade, bump all three together, taking the Camoufox pair from the
 `ARG` defaults in the upstream `Dockerfile` at that tag. The image is tagged with both, so the
@@ -434,8 +434,9 @@ Two layers to the fix:
 
 - **SearXNG side** — `seznam` + `bing` now carry the `general` category and the four blocked
   engines are `disabled: true` (they only cost their timeouts). Canonical list lives in
-  `terraform/scripts/setup-hermes.sh` and `terraform/scripts/fix-searxng-engines.sh`. SearXNG
-  only reads `settings.yml` at start, so re-applying needs a host-side restart:
+  `terraform/scripts/setup-searxng.sh` only (`null_resource.hermes_searxng`; `terraform apply`
+  re-runs it when it changes). SearXNG only reads `settings.yml` at start; to re-apply and
+  smoke-test by hand (runs the server's checkout of `setup-searxng.sh`, so push first):
 
   ```bash
   ssh root@$(terraform output -raw server_ip) 'bash -s' < terraform/scripts/fix-searxng-engines.sh
@@ -472,7 +473,7 @@ failing confusingly if not.
 
 ## dario (non-Claude model router)
 
-[dario](https://github.com/askalf/dario) runs as an optional standalone container (`dario`, pinned in `setup-hermes.sh`) on `127.0.0.1:3456`, exposing one OpenAI- and Anthropic-compatible endpoint in front of a ChatGPT subscription and/or API-key backends. It is installed only when `dario_api_key` is set in `terraform.tfvars` (`openssl rand -hex 32`).
+[dario](https://github.com/askalf/dario) runs as an optional standalone container (`dario`, pinned in `setup-dario.sh`) on `127.0.0.1:3456`, exposing one OpenAI- and Anthropic-compatible endpoint in front of a ChatGPT subscription and/or API-key backends. It is installed only when `dario_api_key` is set in `terraform.tfvars` (`openssl rand -hex 32`).
 
 **Claude is disabled on purpose** (`--no-claude-auth`): routing a Claude subscription through a third-party proxy violates Anthropic's terms and gets accounts banned. Never run `dario login` on this server.
 
@@ -549,10 +550,24 @@ hermes-deploy/
     ├── terraform.tfvars                # Your secrets (gitignored)
     ├── terraform.tfvars.example        # Template for new users
     └── scripts/
-        ├── setup-hermes.sh             # Pull image, configure, start
+        ├── setup-hermes.sh             # Core: pull image, .env/compose, start, crons
+        ├── setup-home-vpn.sh           # wireproxy + gost front proxy + health check/alerts
+        ├── setup-searxng.sh            # SearXNG settings (single source of the engine list)
+        ├── setup-camofox.sh            # Camofox browser container
+        ├── setup-dario.sh              # Optional dario router container
         ├── deploy-profiles.sh          # Deploy SOUL.md + himalaya config
         └── setup-backups.sh            # R2 backup cron via rclone
 ```
+
+### How the server setup is split
+
+Each part of the server setup is its own `null_resource` in `main.tf`, re-run only when its
+own script or its own rendered env file (`terraform/.rendered/hermes-<part>.env`, only the
+variables that part needs) changes: `hermes_setup` (core + `restore-backup.sh`),
+`hermes_home_vpn`, `hermes_searxng`, `hermes_camofox`, `hermes_dario`, plus the older
+`hermes_profiles`, `hermes_backups`, `hermes_snapshot`, `hermes_umami`, … So a VPN key rotation
+or a SearXNG engine change is a small `terraform apply` that doesn't restart the bots — don't
+run the scripts by hand, or Terraform's state stops matching the server.
 
 ## Troubleshooting
 

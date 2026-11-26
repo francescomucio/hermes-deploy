@@ -117,15 +117,58 @@ resource "local_file" "deploy_env" {
     REDDIT_PASSWORD=${var.reddit_password}
     BLIND_USERNAME=${var.blind_username}
     BLIND_PASSWORD=${var.blind_password}
-    CAMOFOX_API_KEY=${var.camofox_api_key}
     DARIO_API_KEY=${var.dario_api_key}
+    HOME_VPN_WEB_ACTIVE=${local.home_vpn_web_active}
+    FORCE_RESTORE=${var.force_restore}
+  EOF
+}
+
+# Parts of the setup that run as their own null_resource (below), each with
+# an env file holding only what that part needs — so e.g. rotating the home
+# VPN keys re-runs only setup-home-vpn.sh, not the whole Hermes setup.
+locals {
+  home_vpn_enabled = nonsensitive(
+    var.home_vpn_client_private_key != "" && var.home_vpn_server_public_key != "" && var.home_vpn_endpoint != ""
+  )
+  home_vpn_web_active     = local.home_vpn_enabled && var.home_vpn_web
+  home_vpn_camofox_active = local.home_vpn_enabled && var.home_vpn_camofox
+}
+
+resource "local_file" "home_vpn_env" {
+  filename        = "${path.module}/.rendered/hermes-home-vpn.env"
+  file_permission = "0600"
+  content         = <<-EOF
     HOME_VPN_ENDPOINT=${var.home_vpn_endpoint}
     HOME_VPN_SERVER_PUBLIC_KEY=${var.home_vpn_server_public_key}
     HOME_VPN_CLIENT_PRIVATE_KEY=${var.home_vpn_client_private_key}
     HOME_VPN_CLIENT_ADDRESS=${var.home_vpn_client_address}
-    HOME_VPN_CAMOFOX=${var.home_vpn_camofox}
-    HOME_VPN_WEB=${var.home_vpn_web}
-    FORCE_RESTORE=${var.force_restore}
+    DISCORD_BOT_TOKEN=${var.discord_bot_token}
+    DISCORD_ALLOWED_USERS=${var.discord_allowed_users}
+  EOF
+}
+
+resource "local_file" "searxng_env" {
+  filename        = "${path.module}/.rendered/hermes-searxng.env"
+  file_permission = "0600"
+  content         = <<-EOF
+    HOME_VPN_WEB_ACTIVE=${local.home_vpn_web_active}
+  EOF
+}
+
+resource "local_file" "camofox_env" {
+  filename        = "${path.module}/.rendered/hermes-camofox.env"
+  file_permission = "0600"
+  content         = <<-EOF
+    CAMOFOX_API_KEY=${var.camofox_api_key}
+    HOME_VPN_CAMOFOX_ACTIVE=${local.home_vpn_camofox_active}
+  EOF
+}
+
+resource "local_file" "dario_env" {
+  filename        = "${path.module}/.rendered/hermes-dario.env"
+  file_permission = "0600"
+  content         = <<-EOF
+    DARIO_API_KEY=${var.dario_api_key}
   EOF
 }
 
@@ -190,6 +233,136 @@ resource "null_resource" "hermes_setup" {
   }
 }
 
+# Home VPN egress: wireproxy + gost front proxy + health check/alerts.
+resource "null_resource" "hermes_home_vpn" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.home_vpn_env.content_sha256
+    script_hash = filesha256("${path.module}/scripts/setup-home-vpn.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.home_vpn_env.filename
+    destination = "/tmp/hermes-home-vpn.env"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-home-vpn.sh"
+    destination = "/tmp/setup-home-vpn.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-home-vpn.sh && /tmp/setup-home-vpn.sh"]
+  }
+}
+
+# SearXNG settings (the searxng container itself is in the Hermes compose stack).
+resource "null_resource" "hermes_searxng" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.searxng_env.content_sha256
+    script_hash = filesha256("${path.module}/scripts/setup-searxng.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.searxng_env.filename
+    destination = "/tmp/hermes-searxng.env"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-searxng.sh"
+    destination = "/tmp/setup-searxng.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-searxng.sh && /tmp/setup-searxng.sh"]
+  }
+}
+
+# Camofox browser server. After the home VPN so its proxy port exists, and
+# after setup-hermes.sh/restore-backup.sh so a fresh install can log in to
+# Reddit right away.
+resource "null_resource" "hermes_camofox" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.camofox_env.content_sha256
+    script_hash = filesha256("${path.module}/scripts/setup-camofox.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup, null_resource.hermes_home_vpn]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.camofox_env.filename
+    destination = "/tmp/hermes-camofox.env"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-camofox.sh"
+    destination = "/tmp/setup-camofox.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-camofox.sh && /tmp/setup-camofox.sh"]
+  }
+}
+
+# dario router (optional; the script removes the container when DARIO_API_KEY is unset).
+resource "null_resource" "hermes_dario" {
+  triggers = {
+    server_id   = hcloud_server.hermes.id
+    env_hash    = local_file.dario_env.content_sha256
+    script_hash = filesha256("${path.module}/scripts/setup-dario.sh")
+  }
+
+  depends_on = [null_resource.hermes_setup]
+
+  connection {
+    type        = "ssh"
+    host        = hcloud_server.hermes.ipv4_address
+    user        = "root"
+    private_key = var.deploy_key
+  }
+
+  provisioner "file" {
+    source      = local_file.dario_env.filename
+    destination = "/tmp/hermes-dario.env"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/setup-dario.sh"
+    destination = "/tmp/setup-dario.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = ["chmod +x /tmp/setup-dario.sh && /tmp/setup-dario.sh"]
+  }
+}
+
 # Profile deployment: SOUL.md, himalaya config
 resource "null_resource" "hermes_profiles" {
   triggers = {
@@ -243,7 +416,14 @@ resource "null_resource" "hermes_verify" {
     always_run = timestamp()
   }
 
-  depends_on = [null_resource.hermes_setup, null_resource.hermes_profiles]
+  depends_on = [
+    null_resource.hermes_setup,
+    null_resource.hermes_profiles,
+    null_resource.hermes_home_vpn,
+    null_resource.hermes_searxng,
+    null_resource.hermes_camofox,
+    null_resource.hermes_dario,
+  ]
 
   connection {
     type        = "ssh"

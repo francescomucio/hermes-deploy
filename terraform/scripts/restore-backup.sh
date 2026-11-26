@@ -175,8 +175,9 @@ EOF
   chown 10000:10000 /root/.hermes/.blind-credentials
 fi
 
-# Fresh Camofox installs (marker left by setup-hermes.sh) need an initial
-# Reddit login — the credentials file above just became available.
+# Fresh Camofox installs need an initial Reddit login. setup-camofox.sh does
+# it itself when the credentials file exists; otherwise it leaves this marker,
+# acted on here once the credentials file above is available.
 if [ -f /tmp/camofox-needs-reddit-login ]; then
   echo "Logging Camofox into Reddit..."
   python3 /opt/hermes-deploy/terraform/scripts/reddit-login.py || \
