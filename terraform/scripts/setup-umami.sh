@@ -14,14 +14,16 @@ set +a
 echo "=== Setting up Umami ($UMAMI_HOSTNAME) ==="
 
 UMAMI_IMAGE="umamisoftware/umami:3.4.1"
-POSTGRES_IMAGE="postgres:16-alpine"           # same major as the Railway original
+POSTGRES_IMAGE="postgres:16.15-alpine"        # same major as the Railway original; exact minor so a re-run never upgrades it silently
 CLOUDFLARED_IMAGE="cloudflare/cloudflared:2026.10.3"
 DIR=/opt/umami
 R2_PATH="r2:hermes-backups/umami"
 
 mkdir -p "$DIR/cloudflared" "$DIR/backups"
 chmod 700 "$DIR"
-TUNNEL_FILES_BEFORE=$(cat "$DIR/cloudflared/credentials.json" "$DIR/cloudflared/config.yml" 2>/dev/null | sha256sum)
+# `|| true`: on a fresh server the files don't exist yet, and with pipefail the
+# failing cat would abort the whole script right here.
+TUNNEL_FILES_BEFORE=$(cat "$DIR/cloudflared/credentials.json" "$DIR/cloudflared/config.yml" 2>/dev/null | sha256sum || true)
 
 install -m 600 /tmp/umami-tunnel.json "$DIR/cloudflared/credentials.json"
 # cloudflared runs as uid 65532 (nonroot) in its image
