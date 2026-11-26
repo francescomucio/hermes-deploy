@@ -187,7 +187,7 @@ Safety:
   multicast and reserved ranges excluded), so nothing using the proxy can reach the router
   (`10.6.0.1`/`192.168.x`) either. DNS goes through the tunnel to `1.1.1.1`/`9.9.9.9`.
 - The home IP changes nightly (1&1 PPPoE reconnect, 04:00); the router updates its ASUS DDNS name
-  and `wireproxy-home-check.timer` restarts the tunnel within ~5 min when the probe fails.
+  and `home-proxy-check.timer` restarts the tunnel within a minute or two (see "Fallback and alerts").
 
 Setup (one-time, on the router — UI: VPN → VPN Server → WireGuard, or over SSH):
 1. ASUS DDNS on (WAN → DDNS), WireGuard server on, Access Intranet off.
@@ -205,12 +205,21 @@ Leaving `home_vpn_client_private_key` empty disables all of it (the unit is remo
 goes direct). `home_vpn_camofox = false` keeps the tunnel up but Camofox direct;
 `home_vpn_web = false` does the same for the gateway and SearXNG.
 
+Fallback and alerts: wireproxy itself listens on `:11080`/`:11081`; a [gost](https://github.com/go-gost/gost)
+front proxy (`home-proxy-front`) owns `:1080`/`:1081`. `home-proxy-check.timer` probes the tunnel every
+minute: 2 failures in a row → the front goes **direct** (Hetzner IP — Blind/Glassdoor stop working, the
+rest keeps working); tunnel back → front returns to **tunnel**. It restarts wireproxy on the first failure
+and every 5th (the endpoint is resolved only at start, so the nightly IP change needs it). After 15 min
+down, Claudiano's bot sends a Discord DM, and another when it recovers.
+
 Check from the VPS:
 
 ```bash
-curl -s --socks5-hostname 127.0.0.1:1080 https://api.ipify.org   # → home IP
-systemctl status wireproxy-home wireproxy-home-check.timer
-journalctl -u wireproxy-home-check -n 20                        # restarts after IP changes
+curl -s --socks5-hostname 127.0.0.1:1080 https://api.ipify.org   # → home IP (or Hetzner IP in fallback)
+curl -s --socks5-hostname 127.0.0.1:11080 https://api.ipify.org  # → home IP, tunnel only
+cat /var/lib/home-proxy/mode                                     # tunnel | direct
+systemctl status wireproxy-home home-proxy-front home-proxy-check.timer
+journalctl -u home-proxy-check -n 20                             # switches, restarts, alerts
 ```
 
 ## Choosing a Model
