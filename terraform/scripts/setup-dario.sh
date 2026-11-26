@@ -3,12 +3,12 @@ set -euo pipefail
 
 # dario router container (optional, DARIO_API_KEY).
 # Run by Terraform (null_resource, see main.tf) after setup-hermes.sh; re-runs
-# only when this script or its own env file (/tmp/hermes-dario.env) changes.
+# only when this script or its own env file (/root/.deploy-staging/hermes-dario.env) changes.
 
 set -a
-source /tmp/hermes-dario.env
+source /root/.deploy-staging/hermes-dario.env
 set +a
-rm -f /tmp/hermes-dario.env
+rm -f /root/.deploy-staging/hermes-dario.env
 
 # dario: local OpenAI/Anthropic-compatible router for non-Claude backends
 # (ChatGPT subscription via `dario add altman`, API-key backends via

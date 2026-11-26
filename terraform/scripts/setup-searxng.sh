@@ -3,15 +3,15 @@ set -euo pipefail
 
 # SearXNG settings (engines, home VPN proxy) + restart.
 # Run by Terraform (null_resource, see main.tf) after setup-hermes.sh; re-runs
-# only when this script or its own env file (/tmp/hermes-searxng.env) changes.
+# only when this script or its own env file (/root/.deploy-staging/hermes-searxng.env) changes.
 #
 # Also runnable by hand on the host (fix-searxng-engines.sh does that): without
 # the env file, the home VPN proxy setting is kept as it was (marker file).
-if [ -f /tmp/hermes-searxng.env ]; then
+if [ -f /root/.deploy-staging/hermes-searxng.env ]; then
   set -a
-  source /tmp/hermes-searxng.env
+  source /root/.deploy-staging/hermes-searxng.env
   set +a
-  rm -f /tmp/hermes-searxng.env
+  rm -f /root/.deploy-staging/hermes-searxng.env
 elif [ -f /opt/searxng/.home-vpn-proxy ]; then
   HOME_VPN_WEB_ACTIVE=true
 fi

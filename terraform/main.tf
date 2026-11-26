@@ -205,12 +205,12 @@ resource "null_resource" "hermes_setup" {
   }
 
   provisioner "remote-exec" {
-    inline = ["cloud-init status --wait || true"]
+    inline = ["cloud-init status --wait || true", "install -d -m 700 /root/.deploy-staging"]
   }
 
   provisioner "file" {
     source      = local_file.deploy_env.filename
-    destination = "/tmp/hermes-deploy.env"
+    destination = "/root/.deploy-staging/setup.env"
   }
 
   provisioner "file" {
@@ -219,7 +219,7 @@ resource "null_resource" "hermes_setup" {
   }
 
   provisioner "remote-exec" {
-    inline = ["chmod +x /tmp/setup-hermes.sh && /tmp/setup-hermes.sh"]
+    inline = ["chmod +x /tmp/setup-hermes.sh && /tmp/setup-hermes.sh /root/.deploy-staging/setup.env"]
   }
 
   # Restore from R2 backup (fresh deploy gets latest data)
@@ -229,7 +229,7 @@ resource "null_resource" "hermes_setup" {
   }
 
   provisioner "remote-exec" {
-    inline = ["chmod +x /tmp/restore-backup.sh && /tmp/restore-backup.sh"]
+    inline = ["chmod +x /tmp/restore-backup.sh && /tmp/restore-backup.sh /root/.deploy-staging/setup.env; rc=$?; rm -f /root/.deploy-staging/setup.env; exit $rc"]
   }
 }
 
@@ -250,9 +250,13 @@ resource "null_resource" "hermes_home_vpn" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.home_vpn_env.filename
-    destination = "/tmp/hermes-home-vpn.env"
+    destination = "/root/.deploy-staging/hermes-home-vpn.env"
   }
 
   provisioner "file" {
@@ -282,9 +286,13 @@ resource "null_resource" "hermes_searxng" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.searxng_env.filename
-    destination = "/tmp/hermes-searxng.env"
+    destination = "/root/.deploy-staging/hermes-searxng.env"
   }
 
   provisioner "file" {
@@ -316,9 +324,13 @@ resource "null_resource" "hermes_camofox" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.camofox_env.filename
-    destination = "/tmp/hermes-camofox.env"
+    destination = "/root/.deploy-staging/hermes-camofox.env"
   }
 
   provisioner "file" {
@@ -348,9 +360,13 @@ resource "null_resource" "hermes_dario" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.dario_env.filename
-    destination = "/tmp/hermes-dario.env"
+    destination = "/root/.deploy-staging/hermes-dario.env"
   }
 
   provisioner "file" {
@@ -388,14 +404,18 @@ resource "null_resource" "hermes_profiles" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.deploy_env.filename
-    destination = "/tmp/hermes-deploy.env"
+    destination = "/root/.deploy-staging/profiles.env"
   }
 
   provisioner "file" {
     source      = local_file.himalaya_config.filename
-    destination = "/tmp/himalaya-config.toml"
+    destination = "/root/.deploy-staging/himalaya-config.toml"
   }
 
   provisioner "file" {
@@ -404,7 +424,7 @@ resource "null_resource" "hermes_profiles" {
   }
 
   provisioner "remote-exec" {
-    inline = ["chmod +x /tmp/deploy-profiles.sh && /tmp/deploy-profiles.sh"]
+    inline = ["chmod +x /tmp/deploy-profiles.sh && /tmp/deploy-profiles.sh /root/.deploy-staging/profiles.env; rc=$?; rm -f /root/.deploy-staging/profiles.env /root/.deploy-staging/himalaya-config.toml; exit $rc"]
   }
 }
 
@@ -432,13 +452,22 @@ resource "null_resource" "hermes_verify" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
+  provisioner "file" {
+    source      = local_file.deploy_env.filename
+    destination = "/root/.deploy-staging/verify.env"
+  }
+
   provisioner "file" {
     source      = "${path.module}/scripts/verify-deploy.sh"
     destination = "/tmp/verify-deploy.sh"
   }
 
   provisioner "remote-exec" {
-    inline = ["chmod +x /tmp/verify-deploy.sh && /tmp/verify-deploy.sh"]
+    inline = ["chmod +x /tmp/verify-deploy.sh && /tmp/verify-deploy.sh /root/.deploy-staging/verify.env; rc=$?; rm -f /root/.deploy-staging/verify.env; exit $rc"]
   }
 }
 
@@ -458,9 +487,13 @@ resource "null_resource" "hermes_backups" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.deploy_env.filename
-    destination = "/tmp/hermes-deploy.env"
+    destination = "/root/.deploy-staging/backups.env"
   }
 
   provisioner "file" {
@@ -469,7 +502,7 @@ resource "null_resource" "hermes_backups" {
   }
 
   provisioner "remote-exec" {
-    inline = ["chmod +x /tmp/setup-backups.sh && /tmp/setup-backups.sh"]
+    inline = ["chmod +x /tmp/setup-backups.sh && /tmp/setup-backups.sh /root/.deploy-staging/backups.env; rc=$?; rm -f /root/.deploy-staging/backups.env; exit $rc"]
   }
 }
 
@@ -614,14 +647,18 @@ resource "null_resource" "hermes_umami" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_file.umami_env[0].filename
-    destination = "/tmp/umami.env"
+    destination = "/root/.deploy-staging/umami.env"
   }
 
   provisioner "file" {
     source      = local_file.umami_tunnel_credentials[0].filename
-    destination = "/tmp/umami-tunnel.json"
+    destination = "/root/.deploy-staging/umami-tunnel.json"
   }
 
   provisioner "file" {
@@ -665,9 +702,13 @@ resource "null_resource" "hermes_runners" {
     private_key = var.deploy_key
   }
 
+  provisioner "remote-exec" {
+    inline = ["install -d -m 700 /root/.deploy-staging"]
+  }
+
   provisioner "file" {
     source      = local_sensitive_file.github_runners[0].filename
-    destination = "/tmp/github-runners.tsv"
+    destination = "/root/.deploy-staging/github-runners.tsv"
   }
 
   provisioner "file" {

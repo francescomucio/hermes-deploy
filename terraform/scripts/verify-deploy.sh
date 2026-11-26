@@ -11,7 +11,7 @@
 set -uo pipefail
 
 set -a
-source /tmp/hermes-deploy.env
+source "${1:-/root/.deploy-staging/hermes-deploy.env}"   # env file path from Terraform (main.tf), root-only staging dir
 set +a
 
 FAIL=0

@@ -4,12 +4,12 @@ set -euo pipefail
 # Home VPN egress: wireproxy (WireGuard to the home router) + gost front proxy
 # + home-proxy-check (fallback to direct, Discord alerts).
 # Run by Terraform (null_resource, see main.tf) after setup-hermes.sh; re-runs
-# only when this script or its own env file (/tmp/hermes-home-vpn.env) changes.
+# only when this script or its own env file (/root/.deploy-staging/hermes-home-vpn.env) changes.
 
 set -a
-source /tmp/hermes-home-vpn.env
+source /root/.deploy-staging/hermes-home-vpn.env
 set +a
-rm -f /tmp/hermes-home-vpn.env
+rm -f /root/.deploy-staging/hermes-home-vpn.env
 
 HOME_VPN_ENABLED=false
 if [ -n "${HOME_VPN_CLIENT_PRIVATE_KEY:-}" ] && [ -n "${HOME_VPN_SERVER_PUBLIC_KEY:-}" ] && [ -n "${HOME_VPN_ENDPOINT:-}" ]; then

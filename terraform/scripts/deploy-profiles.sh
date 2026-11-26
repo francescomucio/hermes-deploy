@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Load config
 set -a
-source /tmp/hermes-deploy.env
+source "${1:-/root/.deploy-staging/hermes-deploy.env}"   # env file path from Terraform (main.tf), root-only staging dir
 set +a
 
 # hermes_profiles can trigger on its own (profiles_hash changed) without
@@ -38,7 +38,7 @@ done
 
 # Write himalaya config
 mkdir -p /root/.hermes/.config/himalaya
-cp /tmp/himalaya-config.toml /root/.hermes/.config/himalaya/config.toml
+cp /root/.deploy-staging/himalaya-config.toml /root/.hermes/.config/himalaya/config.toml
 
 # Deploy skills from deploy repo
 for skill in /opt/hermes-deploy/skills/*/; do

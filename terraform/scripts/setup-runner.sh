@@ -13,7 +13,7 @@ set -euo pipefail
 #   (no-new-privileges), CPU/memory caps with low CPU priority;
 # - the GitHub token only ever lives on the host: it mints a one-hour
 #   registration token per job, and only that enters the container.
-# /tmp/github-runners.tsv: one "name<TAB>org-or-repo URL<TAB>token" line per runner.
+# /root/.deploy-staging/github-runners.tsv: one "name<TAB>org-or-repo URL<TAB>token" line per runner.
 
 echo "=== Setting up GitHub Actions runners ==="
 
@@ -98,7 +98,7 @@ while IFS=$'\t' read -r name url token; do
     systemctl enable -q --now "github-runner@$name"
   fi
   echo "runner $name → $url"
-done < /tmp/github-runners.tsv
+done < /root/.deploy-staging/github-runners.tsv
 
 for f in "$DIR"/*.env; do
   [ -e "$f" ] || continue
@@ -110,5 +110,5 @@ for f in "$DIR"/*.env; do
   esac
 done
 
-rm -f /tmp/github-runners.tsv
+rm -f /root/.deploy-staging/github-runners.tsv
 echo "=== GitHub runners configured:${WANTED:- none} ==="

@@ -8,7 +8,7 @@ set -euo pipefail
 # database restores the latest dump before Umami starts.
 
 set -a
-source /tmp/umami.env
+source /root/.deploy-staging/umami.env
 set +a
 
 echo "=== Setting up Umami ($UMAMI_HOSTNAME) ==="
@@ -25,7 +25,7 @@ chmod 700 "$DIR"
 # failing cat would abort the whole script right here.
 TUNNEL_FILES_BEFORE=$(cat "$DIR/cloudflared/credentials.json" "$DIR/cloudflared/config.yml" 2>/dev/null | sha256sum || true)
 
-install -m 600 /tmp/umami-tunnel.json "$DIR/cloudflared/credentials.json"
+install -m 600 /root/.deploy-staging/umami-tunnel.json "$DIR/cloudflared/credentials.json"
 # cloudflared runs as uid 65532 (nonroot) in its image
 chown 65532:65532 "$DIR/cloudflared" "$DIR/cloudflared/credentials.json"
 cat > "$DIR/cloudflared/config.yml" <<EOF
@@ -137,5 +137,5 @@ for i in $(seq 1 30); do
 done
 curl -sf http://127.0.0.1:3001/api/heartbeat >/dev/null || { echo "Umami not healthy"; docker compose logs --tail 30 umami; exit 1; }
 
-rm -f /tmp/umami.env /tmp/umami-tunnel.json
+rm -f /root/.deploy-staging/umami.env /root/.deploy-staging/umami-tunnel.json
 echo "=== Umami up: https://$UMAMI_HOSTNAME (backups daily 02:45 UTC → $R2_PATH) ==="
